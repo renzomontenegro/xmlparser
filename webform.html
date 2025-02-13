@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Procesador de Facturas XML</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="upload-section">
+            <h2>Procesador de Facturas XML</h2>
+            <p>Sube un archivo XML o completa el formulario manualmente</p>
+            <input type="file" id="xmlFile" accept=".xml">
+            <button type="button" id="clearFormBtn" style="margin: 10px 0px;">Limpiar Todo</button>
+        </div>
+
+        <form id="invoiceForm">
+            <div class="form-grid">
+                <!-- Sección 1: Información básica -->
+                <div class="form-group">
+                    <label for="ruc">RUC</label>
+                    <input type="text" id="ruc" name="ruc" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="razonSocial">Razón Social</label>
+                    <input type="text" id="razonSocial" name="razonSocial" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="moneda">Moneda</label>
+                    <select id="moneda" name="moneda" required>
+                        <option value="">Seleccione...</option>
+                        <option value="USD">USD</option>
+                        <option value="PEN">PEN</option>
+                    </select>
+                </div>
+
+                <!-- Sección 2: Fechas y números -->
+                <div class="form-group">
+                    <label for="fechaEmision">Fecha Emisión</label>
+                    <input type="date" id="fechaEmision" name="fechaEmision" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="fechaVencimiento">Fecha Vencimiento</label>
+                    <input type="date" id="fechaVencimiento" name="fechaVencimiento" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="numeroComprobante">N° Comprobante de Pago</label>
+                    <input type="text" id="numeroComprobante" name="numeroComprobante" required>
+                </div>
+
+                <!-- Sección 3: Importes y condiciones -->
+                <div class="form-group">
+                    <label for="importe">Importe</label>
+                    <input type="number" step="0.01" id="importe" name="importe" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="condicionPago">Condición de Pago - Crédito (días)</label>
+                    <input type="number" id="condicionPago" name="condicionPago">
+                    <!--class="readonly" readonly-->
+                </div>
+
+                <div class="form-group">
+                    <label for="porcentajeDetraccion">Porcentaje detracción</label>
+                    <input type="number" step="0.01" id="porcentajeDetraccion" name="porcentajeDetraccion">
+                </div>
+
+                <!-- Sección 4: Información adicional -->
+                <div class="form-group">
+                    <label for="solicitante">Solicitante</label>
+                    <input type="text" id="solicitante" name="solicitante">
+                </div>
+
+                <div class="form-group">
+                    <label for="areaSolicitante">Área Solicitante</label>
+                    <input type="text" id="areaSolicitante" name="areaSolicitante">
+                </div>
+
+                <div class="form-group">
+                    <label for="codigoBien">Código del Bien</label>
+                    <input type="text" id="codigoBien" name="codigoBien">
+                </div>
+
+                <!-- Sección 5: Fechas de licencia -->
+                <div class="form-group">
+                    <label for="fechaInicioLicencia">Fecha Inicio Licencia</label>
+                    <input type="date" id="fechaInicioLicencia" name="fechaInicioLicencia">
+                </div>
+
+                <div class="form-group">
+                    <label for="fechaFinLicencia">Fecha Fin Licencia</label>
+                    <input type="date" id="fechaFinLicencia" name="fechaFinLicencia">
+                </div>
+
+                <div class="form-group">
+                    <label for="descripcion">Descripción</label>
+                    <input type="text" id="descripcion" name="descripcion">
+                </div>
+            </div>
+
+            <!-- Sección de Items -->
+            <div class="items-section">
+                <h3>Items del Comprobante</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>N° Item</th>
+                            <th>Importe</th>
+                            <th>Porcentaje (%)</th>
+                            <th>Línea de negocio</th>
+                            <th>Centro de Costo</th>
+                            <th>Proyecto</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="itemsTableBody">
+                        <!-- Los items se agregarán dinámicamente -->
+                    </tbody>
+                </table>
+                <button type="button" id="addItemBtn" style="margin-top: 10px;">Agregar Item</button>
+            </div>
+
+            <button type="submit" style="margin-top: 20px; background-color: #28a745;">Guardar Formulario</button>
+        </form>
+    </div>
+
+    <script src="xml_parser.js"></script>
+</body>
+</html>
