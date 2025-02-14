@@ -62,7 +62,6 @@
                 <div class="form-group">
                     <label for="condicionPago">Condición de Pago - Crédito (días)</label>
                     <input type="number" id="condicionPago" name="condicionPago">
-                    <!--class="readonly" readonly-->
                 </div>
 
                 <div class="form-group">
@@ -125,10 +124,20 @@
                 <button type="button" id="addItemBtn" style="margin-top: 10px;">Agregar Item</button>
             </div>
 
-            <button type="submit" style="margin-top: 20px; background-color: #28a745;">Guardar Formulario</button>
+            <div style="text-align: center; margin-top: 20px;">
+                <button type="button" id="exportSolicitudBtn" style="margin: 0 10px; background-color: #28a745;">
+                    Exportar en Plantilla Solicitud de Ingreso de Facturas
+                </button>
+                <button type="button" id="exportERPBtn" style="margin: 0 10px; background-color: #28a745;">
+                    Exportar en formato ERP
+                </button>
+            </div>
         </form>
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx-populate/browser/xlsx-populate.min.js"></script>
     <script src="xml_parser.js"></script>
+    <script src="exportacion.js"></script>
 </body>
 </html>
