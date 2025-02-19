@@ -49,28 +49,19 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="numeroComprobanteParte1">N° Comprobante de Pago</label>
-                    <div class="comprobante-container">
-                        <input type="text" id="numeroComprobanteParte1" maxlength="4" required>
-                        <span class="separator">-</span>
-                        <input type="text" id="numeroComprobanteParte2" maxlength="8" required>
-                        <input type="hidden" id="numeroComprobante" name="numeroComprobante">
-                    </div>
-                    <small class="form-text text-muted">
-                        Formato: XXXX-XXXXXXXX (ejemplo: F001-00000123)
-                    </small>
+                    <label for="numeroComprobante">N° Comprobante de Pago</label>
+                    <input type="text" id="numeroComprobante" name="numeroComprobante" required>
                 </div>
 
                 <!-- Sección 3: Importes y condiciones -->
                 <div class="form-group">
-                    <label for="importe">Importe Total</label>
+                    <label for="importe">Importe</label>
                     <input type="number" step="0.01" id="importe" name="importe" required>
-                    <small class="form-text text-muted">(Importe con IGV)</small>
                 </div>
 
                 <div class="form-group">
                     <label for="condicionPago">Condición de Pago - Crédito (días)</label>
-                    <input type="number" id="condicionPago" name="condicionPago" required>
+                    <input type="number" id="condicionPago" name="condicionPago">
                 </div>
 
                 <div class="form-group">
@@ -81,12 +72,12 @@
                 <!-- Sección 4: Información adicional -->
                 <div class="form-group">
                     <label for="solicitante">Solicitante</label>
-                    <input type="text" id="solicitante" name="solicitante" required>
+                    <input type="text" id="solicitante" name="solicitante">
                 </div>
 
                 <div class="form-group">
                     <label for="areaSolicitante">Área Solicitante</label>
-                    <input type="text" id="areaSolicitante" name="areaSolicitante" required>
+                    <input type="text" id="areaSolicitante" name="areaSolicitante">
                 </div>
 
                 <div class="form-group">
@@ -107,7 +98,7 @@
 
                 <div class="form-group">
                     <label for="descripcion">Descripción</label>
-                    <input type="text" id="descripcion" name="descripcion" required>
+                    <input type="text" id="descripcion" name="descripcion">
                 </div>
             </div>
 
@@ -118,7 +109,7 @@
                     <thead>
                         <tr>
                             <th>N° Item</th>
-                            <th>Base Imponible <small class="text-muted">(Importe sin IGV)</small></th>
+                            <th>Importe</th>
                             <th>Porcentaje (%)</th>
                             <th>Línea de negocio</th>
                             <th>Centro de Costo</th>

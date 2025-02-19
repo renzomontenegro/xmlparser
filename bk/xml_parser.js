@@ -6,7 +6,6 @@ class InvoiceParser {
             'sac': 'urn:sunat:names:specification:ubl:peru:schema:xsd:SunatAggregateComponents-1'
         };
         this.initializeEventListeners();
-        this.initializeComprobanteFormat();
     }
 
     initializeEventListeners() {
@@ -16,78 +15,6 @@ class InvoiceParser {
         document.getElementById('fechaEmision').addEventListener('change', () => this.updateCreditDays());
         document.getElementById('fechaVencimiento').addEventListener('change', () => this.updateCreditDays());
         document.getElementById('clearFormBtn').addEventListener('click', () => this.clearForm());
-    }
-
-    initializeComprobanteFormat() {
-        const parte1 = document.getElementById('numeroComprobanteParte1');
-        const parte2 = document.getElementById('numeroComprobanteParte2');
-        const numeroComprobanteCompleto = document.getElementById('numeroComprobante');
-    
-        // Crear tooltips para los mensajes de validación
-        const tooltip1 = document.createElement('div');
-        tooltip1.className = 'validation-tooltip';
-        const tooltip2 = document.createElement('div');
-        tooltip2.className = 'validation-tooltip';
-    
-        parte1.parentElement.appendChild(tooltip1);
-        parte2.parentElement.appendChild(tooltip2);
-    
-        const handleParte1 = (input) => {
-            // Limitar a 4 caracteres
-            input.value = input.value.slice(0, 4);
-            
-            // Validar y mostrar mensaje
-            if (input.value.length < 4) {
-                tooltip1.textContent = `Faltan ${4 - input.value.length} dígitos`;
-                tooltip1.style.display = 'block';
-            } else {
-                tooltip1.style.display = 'none';
-            }
-    
-            actualizarComprobanteCompleto();
-        };
-    
-        const handleParte2 = (input) => {
-            // Solo permitir números y limitar a 8 dígitos
-            input.value = input.value.replace(/\D/g, '').slice(0, 8);
-            
-            // Validar y mostrar mensaje
-            if (input.value.length < 8) {
-                tooltip2.textContent = `Faltan ${8 - input.value.length} dígitos`;
-                tooltip2.style.display = 'block';
-            } else {
-                tooltip2.style.display = 'none';
-            }
-    
-            actualizarComprobanteCompleto();
-        };
-    
-        const actualizarComprobanteCompleto = () => {
-            numeroComprobanteCompleto.value = `${parte1.value}-${parte2.value}`;
-        };
-    
-        // Eventos para parte1
-        parte1.addEventListener('input', () => handleParte1(parte1));
-        parte1.addEventListener('blur', () => {
-            if (parte1.value.length < 4) {
-                tooltip1.style.display = 'block';
-            }
-        });
-    
-        // Eventos para parte2
-        parte2.addEventListener('input', () => handleParte2(parte2));
-        parte2.addEventListener('blur', () => {
-            if (parte2.value.length < 8) {
-                tooltip2.style.display = 'block';
-            }
-        });
-    
-        // Prevenir entrada de caracteres no numéricos SOLO para parte2
-        parte2.addEventListener('keypress', (e) => {
-            if (!/^\d$/.test(e.key)) {
-                e.preventDefault();
-            }
-        });
     }
 
     getInvoiceId(xmlDoc) {
@@ -198,13 +125,14 @@ class InvoiceParser {
                 importe: importe,
                 fechaVencimiento: this.getElementValue(xmlDoc, "DueDate"),
                 solicitante: '',
-                descripcion: '',
+                descripcion: Array.from(this.getElements(xmlDoc, "Note"))
+                    .find(note => !note.getAttribute('languageLocaleID'))?.textContent || '',
                 codigoBien: '',
                 porcentajeDetraccion: this.getDetractionPercentage(xmlDoc),
                 fechaInicioLicencia: '',
                 fechaFinLicencia: '',
                 areaSolicitante: '',
-                items: []
+                items: this.parseInvoiceItems(xmlDoc, importe)
             };
         } catch (error) {
             console.error('Error parsing XML:', error);
@@ -315,21 +243,13 @@ class InvoiceParser {
                 if (element) element.value = value;
             }
         }
-    
-        // Limpiar items existentes y agregar una fila vacía
+
+        // Poblar items
         this.clearItems();
-        this.addNewItem();
-    
+        data.items.forEach(item => this.addNewItem(item));
+
         // Actualizar días de crédito
         this.updateCreditDays();
-
-        if (data.invoice_data.numeroComprobante) {
-            const [parte1, parte2] = data.invoice_data.numeroComprobante.split('-');
-            document.getElementById('numeroComprobanteParte1').value = parte1 || '0000';
-            document.getElementById('numeroComprobanteParte2').value = parte2 || '00000000';
-            document.getElementById('numeroComprobante').value = data.invoice_data.numeroComprobante;
-        }
-
     }
 
     clearItems() {
@@ -339,107 +259,35 @@ class InvoiceParser {
 
     addNewItem(itemData = null) {
         const tbody = document.getElementById('itemsTableBody');
-        const importeTotal = parseFloat(document.getElementById('importe').value) || 0;
-        const importeSinIGV = importeTotal / 1.18;
         
-        // Obtener índice correcto contando solo las filas de items (no las de totales)
-        const itemRows = tbody.querySelectorAll('tr:not(#totalRow):not(#importeSinIGVRow):not(#importeConIGVRow)');
-        const rowIndex = itemRows.length + 1;
-    
+        // Remover temporalmente la fila de total si existe
+        const totalRow = document.getElementById('totalRow');
+        if (totalRow) {
+            totalRow.remove();
+        }
+        
         const newRow = document.createElement('tr');
+        const rowIndex = totalRow ? tbody.children.length + 1 : tbody.children.length + 1;
+    
+        // Asegurarse de que los valores sean strings válidos
+        const importe = itemData?.importe ? Number(itemData.importe).toFixed(2) : '';
+        const porcentaje = itemData?.porcentaje ? Number(itemData.porcentaje).toFixed(2) : '';
+    
         newRow.innerHTML = `
             <td>${rowIndex}</td>
-            <td><input type="number" step="0.01" class="item-importe" value="" placeholder="Monto sin IGV"></td>
-            <td><input type="number" step="0.01" class="item-porcentaje" value="" placeholder="%"></td>
-            <td><input type="text" class="item-lineaNegocio" value=""></td>
-            <td><input type="text" class="item-centroCosto" value=""></td>
-            <td><input type="text" class="item-proyecto" value=""></td>
+            <td><input type="number" step="0.01" class="item-importe" value="${importe}" onchange="window.invoiceParser.updateItemPercentages()"></td>
+            <td><input type="number" step="0.01" class="item-porcentaje" value="${porcentaje}" readonly></td>
+            <td><input type="text" class="item-lineaNegocio" value="${itemData?.lineaNegocio || ''}"></td>
+            <td><input type="text" class="item-centroCosto" value="${itemData?.centroCosto || ''}"></td>
+            <td><input type="text" class="item-proyecto" value="${itemData?.proyecto || ''}"></td>
             <td><button type="button" class="remove-btn" onclick="window.invoiceParser.removeItem(this)">Eliminar</button></td>
         `;
     
-        // Insertar la nueva fila antes de la fila de totales si existe
-        const totalRow = document.getElementById('totalRow');
-        if (totalRow) {
-            tbody.insertBefore(newRow, totalRow);
-        } else {
-            tbody.appendChild(newRow);
-        }
-    
-        // Agregar eventos a los campos
-        const importeInput = newRow.querySelector('.item-importe');
-        const porcentajeInput = newRow.querySelector('.item-porcentaje');
-    
-        porcentajeInput.addEventListener('change', () => {
-            const porcentaje = parseFloat(porcentajeInput.value) || 0;
-            const nuevoImporte = (importeSinIGV * porcentaje / 100);
-            importeInput.value = nuevoImporte.toFixed(2);
-            this.updateTotalsAndReferences();
-        });
-    
-        importeInput.addEventListener('change', () => {
-            const importe = parseFloat(importeInput.value) || 0;
-            const nuevoPorcentaje = (importe / importeSinIGV * 100);
-            porcentajeInput.value = nuevoPorcentaje.toFixed(2);
-            this.updateTotalsAndReferences();
-        });
-    
-        this.updateTotalsAndReferences();
-    }
-
-    updateTotalsAndReferences() {
-        const importeTotal = parseFloat(document.getElementById('importe').value) || 0;
-        const importeSinIGV = importeTotal / 1.18;
-    
-        const tbody = document.getElementById('itemsTableBody');
+        tbody.appendChild(newRow);
         
-        // Remover filas de totales y referencias si existen
-        ['totalRow', 'importeSinIGVRow', 'importeConIGVRow'].forEach(id => {
-            const row = document.getElementById(id);
-            if (row) row.remove();
-        });
-    
-        // Calcular sumas
-        const items = tbody.getElementsByClassName('item-importe');
-        const porcentajes = tbody.getElementsByClassName('item-porcentaje');
-        let sumImportes = 0;
-        let sumPorcentajes = 0;
-    
-        Array.from(items).forEach((item, index) => {
-            sumImportes += parseFloat(item.value) || 0;
-            sumPorcentajes += parseFloat(porcentajes[index].value) || 0;
-        });
-    
-        // Crear fila de totales
-        const totalRow = document.createElement('tr');
-        totalRow.id = 'totalRow';
-        totalRow.innerHTML = `
-            <td><strong>Total:</strong></td>
-            <td class="text-right"><strong>${sumImportes.toFixed(2)}</strong></td>
-            <td class="text-right"><strong>${sumPorcentajes.toFixed(2)}%</strong></td>
-            <td colspan="4"></td>
-        `;
-        tbody.appendChild(totalRow);
-    
-        // Agregar filas de referencia
-        const importeSinIGVRow = document.createElement('tr');
-        importeSinIGVRow.id = 'importeSinIGVRow';
-        importeSinIGVRow.innerHTML = `
-            <td><strong>Importe SIN IGV (-18%):</strong></td>
-            <td class="text-right">${importeSinIGV.toFixed(2)}</td>
-            <td colspan="5"></td>
-        `;
-        tbody.appendChild(importeSinIGVRow);
-    
-        const importeConIGVRow = document.createElement('tr');
-        importeConIGVRow.id = 'importeConIGVRow';
-        importeConIGVRow.innerHTML = `
-            <td><strong>Importe CON IGV:</strong></td>
-            <td class="text-right">${importeTotal.toFixed(2)}</td>
-            <td colspan="5"></td>
-        `;
-        tbody.appendChild(importeConIGVRow);
+        // Actualizar los porcentajes y totales
+        this.updateItemPercentages();
     }
-
 
     removeItem(button) {
         const row = button.closest('tr');
@@ -497,33 +345,19 @@ class InvoiceParser {
     }
 
     updateCreditDays() {
-        const condicionPagoInput = document.getElementById('condicionPago');
-        const fechaEmisionInput = document.getElementById('fechaEmision');
-        
-        // Agregar evento al input de condición de pago
-        condicionPagoInput.addEventListener('change', () => {
-            this.calculateDueDate();
-        });
-    
-        // Agregar evento a la fecha de emisión
-        fechaEmisionInput.addEventListener('change', () => {
-            this.calculateDueDate();
-        });
-    }
-
-    calculateDueDate() {
         const fechaEmision = document.getElementById('fechaEmision').value;
-        const diasCredito = parseInt(document.getElementById('condicionPago').value) || 0;
+        const fechaVencimiento = document.getElementById('fechaVencimiento').value;
         
-        if (fechaEmision && !isNaN(diasCredito)) {
-            const fechaBase = new Date(fechaEmision);
-            const fechaVencimiento = new Date(fechaBase.setDate(fechaBase.getDate() + diasCredito));
-            
-            // Formatear la fecha para el input date (YYYY-MM-DD)
-            const fechaFormateada = fechaVencimiento.toISOString().split('T')[0];
-            document.getElementById('fechaVencimiento').value = fechaFormateada;
+        // Solo calcular si ambas fechas están disponibles
+        if (fechaEmision && fechaVencimiento) {
+            const emision = new Date(fechaEmision);
+            const vencimiento = new Date(fechaVencimiento);
+            const diffTime = Math.abs(vencimiento - emision);
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            document.getElementById('condicionPago').value = diffDays;
         } else {
-            document.getElementById('fechaVencimiento').value = '';
+            // Si falta alguna fecha, dejar el campo vacío
+            document.getElementById('condicionPago').value = '';
         }
     }
 
@@ -532,7 +366,7 @@ class InvoiceParser {
             basic: {},
             items: []
         };
-    
+
         // Lista de campos básicos a recolectar
         const basicFields = [
             'ruc', 'razonSocial', 'moneda', 'fechaEmision', 'numeroComprobante',
@@ -540,48 +374,38 @@ class InvoiceParser {
             'descripcion', 'codigoBien', 'porcentajeDetraccion', 'fechaInicioLicencia',
             'fechaFinLicencia', 'areaSolicitante'
         ];
-    
+
         // Recolectar datos básicos con validación
         basicFields.forEach(field => {
             const element = document.getElementById(field);
             if (element) {
                 formData.basic[field] = element.value || '';
             } else {
-                formData.basic[field] = '';
+                formData.basic[field] = ''; // Valor por defecto si el elemento no existe
                 console.warn(`Campo ${field} no encontrado en el formulario`);
             }
         });
-        
-        formData.basic.numeroComprobante = document.getElementById('numeroComprobante').value;
 
-        // Recolectar solo las filas de items (excluyendo las filas de totales y referencias)
+        // Recolectar items con validación
         const tbody = document.getElementById('itemsTableBody');
         if (tbody) {
             const rows = tbody.getElementsByTagName('tr');
-            for (let row of rows) {
-                // Excluir las filas de totales y referencias
-                if (!row.id && !row.id?.includes('total') && !row.id?.includes('importe')) {
-                    const importeInput = row.querySelector('.item-importe');
-                    const porcentajeInput = row.querySelector('.item-porcentaje');
-                    const lineaNegocioInput = row.querySelector('.item-lineaNegocio');
-                    const centroCostoInput = row.querySelector('.item-centroCosto');
-                    const proyectoInput = row.querySelector('.item-proyecto');
-    
-                    if (importeInput) { // Si existe el input de importe, es una fila de item válida
-                        const item = {
-                            numeroItem: formData.items.length + 1,
-                            importe: importeInput.value || '0',
-                            porcentaje: porcentajeInput?.value || '0',
-                            lineaNegocio: lineaNegocioInput?.value || '',
-                            centroCosto: centroCostoInput?.value || '',
-                            proyecto: proyectoInput?.value || ''
-                        };
-                        formData.items.push(item);
-                    }
+            Array.from(rows).forEach(row => {
+                // Verificar que no sea la fila de totales
+                if (!row.classList.contains('total-row')) {
+                    const item = {
+                        numeroItem: row.cells[0]?.textContent || '',
+                        importe: row.querySelector('.item-importe')?.value || '0',
+                        porcentaje: row.querySelector('.item-porcentaje')?.value || '0',
+                        lineaNegocio: row.querySelector('.item-lineaNegocio')?.value || '',
+                        centroCosto: row.querySelector('.item-centroCosto')?.value || '',
+                        proyecto: row.querySelector('.item-proyecto')?.value || ''
+                    };
+                    formData.items.push(item);
                 }
-            }
+            });
         }
-    
+
         return formData;
     }
 }
