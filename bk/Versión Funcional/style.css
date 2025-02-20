@@ -144,6 +144,44 @@ input[type="file"] {
     box-shadow: none;
 }
 
+/*Estilos para los campos requeridos*/
+
+input[required]:invalid,
+select[required]:invalid {
+    border: 2px solid #dc3545;
+    background-color: #fff;
+}
+
+input[required]:valid,
+select[required]:valid {
+    border: 1px solid #ced4da;
+    background-color: #fff;
+}
+
+input:not([required]),
+select:not([required]) {
+    border: 1px solid #ced4da;
+    background-color: #fff;
+}
+
+input[required]:invalid:focus,
+select[required]:invalid:focus {
+    border-color: #dc3545;
+    box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);
+    outline: none;
+}
+
+input:valid:focus,
+select:valid:focus {
+    border-color: #80bdff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+    outline: none;
+}
+
+input:required:invalid {
+    box-shadow: none;
+}
+
 
 .form-text {
     display: block;
@@ -236,152 +274,4 @@ input[type="file"] {
 
 .comprobante-container input {
     margin-bottom: 4px;
-}
-
-
-/* Searchable Select Styles */
-/* Agregar al style.css */
-.select-search {
-    width: 100%;
-    padding: 8px;
-    border: none;
-    background: transparent;
-    outline: none;
-    margin: 0;
-    font-family: inherit;
-    font-size: inherit;
-}
-
-.search-option {
-    background-color: #f8f9fa;
-    padding: 0 !important;
-}
-
-.search-option:hover {
-    background-color: #f8f9fa !important;
-}
-
-select option {
-    padding: 8px;
-}
-
-/* Asegurar que la opción de búsqueda no se pueda seleccionar */
-select option[value="search"] {
-    color: inherit;
-    font-style: normal;
-}
-
-
-/*estilos mejorados*/
-
-/* Agregar estos estilos */
-.reference-row, .total-row {
-    background-color: #f8f9fa;
-}
-
-.reference-row td, .total-row td {
-    padding: 8px;
-}
-
-.reference-row:hover, .total-row:hover {
-    background-color: #f8f9fa;
-}
-
-tr:not(.reference-row):not(.total-row):hover {
-    background-color: #f5f5f5;
-}
-
-.text-right {
-    text-align: right;
-}
-
-#itemsTableBody tr:not(.reference-row):not(.total-row) td:nth-child(2),
-#itemsTableBody tr:not(.reference-row):not(.total-row) td:nth-child(3) {
-    padding: 4px;
-}
-
-
-/*Manejador de busqueda de cuenta contable*/
-.custom-select-container {
-    position: relative;
-    width: 100%;
-}
-
-.custom-select-container input[type="text"] {
-    width: 100%;
-    padding: 8px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    font-size: 14px;
-}
-
-.custom-select-container input[type="text"]:focus {
-    outline: none;
-    border-color: #4A90E2;
-    box-shadow: 0 0 5px rgba(74,144,226,0.3);
-}
-
-/* Modificar en style.css - ajustar los estilos del select-options */
-.select-options {
-    display: none;
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    max-height: 200px; /* Altura máxima ajustada */
-    overflow-y: auto;
-    background: white;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    z-index: 1000;
-    margin-top: 2px;
-}
-
-.select-option {
-    padding: 8px 12px;
-    cursor: pointer;
-    border-bottom: 1px solid #eee;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.select-option:last-child {
-    border-bottom: none;
-}
-
-.select-options.active {
-    display: block;
-}
-
-.select-option {
-    padding: 8px 12px;
-    cursor: pointer;
-}
-
-.select-option:hover {
-    background-color: #f5f5f5;
-}
-
-.select-option.selected {
-    background-color: #e3f2fd;
-}
-
-/* Estilos para la barra de desplazamiento */
-.select-options::-webkit-scrollbar {
-    width: 8px;
-}
-
-.select-options::-webkit-scrollbar-track {
-    background: #f1f1f1;
-}
-
-.select-options::-webkit-scrollbar-thumb {
-    background: #888;
-    border-radius: 4px;
-}
-
-.select-options::-webkit-scrollbar-thumb:hover {
-    background: #555;
 }

@@ -194,13 +194,13 @@ class InvoiceParser {
                 razonSocial: this.getElementValue(xmlDoc, "RegistrationName"),
                 moneda: this.standardizeCurrency(this.getElementValue(xmlDoc, "DocumentCurrencyCode")),
                 fechaEmision: this.getElementValue(xmlDoc, "IssueDate"),
-                numeroComprobante: '',
+                numeroComprobante: invoiceId,
                 importe: importe,
                 fechaVencimiento: this.getElementValue(xmlDoc, "DueDate"),
                 solicitante: '',
                 descripcion: '',
-                //codigoBien: '',
-                //porcentajeDetraccion: this.getDetractionPercentage(xmlDoc),
+                codigoBien: '',
+                porcentajeDetraccion: this.getDetractionPercentage(xmlDoc),
                 fechaInicioLicencia: '',
                 fechaFinLicencia: '',
                 areaSolicitante: '',
@@ -308,37 +308,28 @@ class InvoiceParser {
     }
 
     populateForm(data) {
-        // Crear una lista de campos que NO deben ser autocompletados
-        const excludeFields = [
-            'condicionPago',
-            'porcentajeDetraccion',
-            'codigoBien',
-            'cuentaContable',
-            'tipoFactura'
-        ];
-
-        // Poblar solo los campos que no están en la lista de exclusión
+        // Poblar campos básicos
         for (const [key, value] of Object.entries(data)) {
-            if (!excludeFields.includes(key)) {
+            if (key !== 'items') {
                 const element = document.getElementById(key);
                 if (element) element.value = value;
             }
         }
-
-        // Limpiar items existentes y agregar nueva fila
+    
+        // Limpiar items existentes y agregar una fila vacía
         this.clearItems();
         this.addNewItem();
-
+    
         // Actualizar días de crédito
         this.updateCreditDays();
 
-        // Manejar el número de comprobante
-        if (data.numeroComprobante) {
-            const [parte1, parte2] = data.numeroComprobante.split('-');
-            document.getElementById('numeroComprobanteParte1').value = parte1 || '';
-            document.getElementById('numeroComprobanteParte2').value = parte2 || '';
-            document.getElementById('numeroComprobante').value = data.numeroComprobante;
+        if (data.invoice_data.numeroComprobante) {
+            const [parte1, parte2] = data.invoice_data.numeroComprobante.split('-');
+            document.getElementById('numeroComprobanteParte1').value = parte1 || '0000';
+            document.getElementById('numeroComprobanteParte2').value = parte2 || '00000000';
+            document.getElementById('numeroComprobante').value = data.invoice_data.numeroComprobante;
         }
+
     }
 
     clearItems() {
@@ -396,36 +387,31 @@ class InvoiceParser {
     }
 
     updateTotalsAndReferences() {
-        const tbody = document.getElementById('itemsTableBody');
         const importeTotal = parseFloat(document.getElementById('importe').value) || 0;
         const importeSinIGV = importeTotal / 1.18;
     
-        // Remover filas de totales existentes si hay
+        const tbody = document.getElementById('itemsTableBody');
+        
+        // Remover filas de totales y referencias si existen
         ['totalRow', 'importeSinIGVRow', 'importeConIGVRow'].forEach(id => {
-            const existingRow = document.getElementById(id);
-            if (existingRow) {
-                existingRow.remove();
-            }
+            const row = document.getElementById(id);
+            if (row) row.remove();
         });
     
-        // Calcular sumas solo de las filas de items
-        const items = tbody.querySelectorAll('tr:not(.total-row):not(#totalRow):not(#importeSinIGVRow):not(#importeConIGVRow)');
+        // Calcular sumas
+        const items = tbody.getElementsByClassName('item-importe');
+        const porcentajes = tbody.getElementsByClassName('item-porcentaje');
         let sumImportes = 0;
         let sumPorcentajes = 0;
     
-        items.forEach(row => {
-            const importeInput = row.querySelector('.item-importe');
-            const porcentajeInput = row.querySelector('.item-porcentaje');
-            if (importeInput && porcentajeInput) {
-                sumImportes += parseFloat(importeInput.value) || 0;
-                sumPorcentajes += parseFloat(porcentajeInput.value) || 0;
-            }
+        Array.from(items).forEach((item, index) => {
+            sumImportes += parseFloat(item.value) || 0;
+            sumPorcentajes += parseFloat(porcentajes[index].value) || 0;
         });
     
-        // Crear y agregar fila de totales
+        // Crear fila de totales
         const totalRow = document.createElement('tr');
         totalRow.id = 'totalRow';
-        totalRow.classList.add('total-row');
         totalRow.innerHTML = `
             <td><strong>Total:</strong></td>
             <td class="text-right"><strong>${sumImportes.toFixed(2)}</strong></td>
@@ -437,7 +423,6 @@ class InvoiceParser {
         // Agregar filas de referencia
         const importeSinIGVRow = document.createElement('tr');
         importeSinIGVRow.id = 'importeSinIGVRow';
-        importeSinIGVRow.classList.add('reference-row');
         importeSinIGVRow.innerHTML = `
             <td><strong>Importe SIN IGV (-18%):</strong></td>
             <td class="text-right">${importeSinIGV.toFixed(2)}</td>
@@ -447,7 +432,6 @@ class InvoiceParser {
     
         const importeConIGVRow = document.createElement('tr');
         importeConIGVRow.id = 'importeConIGVRow';
-        importeConIGVRow.classList.add('reference-row');
         importeConIGVRow.innerHTML = `
             <td><strong>Importe CON IGV:</strong></td>
             <td class="text-right">${importeTotal.toFixed(2)}</td>
@@ -461,20 +445,13 @@ class InvoiceParser {
         const row = button.closest('tr');
         row.remove();
         this.renumberItems();
-        this.updateTotalsAndReferences();
+        this.updateItemPercentages();
     }
 
     renumberItems() {
-        const tbody = document.getElementById('itemsTableBody');
-        const rows = tbody.getElementsByTagName('tr');
-        let itemNumber = 1;
-    
+        const rows = document.getElementById('itemsTableBody').getElementsByTagName('tr');
         for (let i = 0; i < rows.length; i++) {
-            const row = rows[i];
-            // Solo renumerar si no es una fila de totales o referencias
-            if (!row.id && !row.classList.contains('total-row')) {
-                row.cells[0].textContent = itemNumber++;
-            }
+            rows[i].cells[0].textContent = i + 1;
         }
     }
 
