@@ -365,7 +365,8 @@ class InvoiceParser {
             <td><input type="text" class="item-proyecto" value=""></td>
             <td><button type="button" class="remove-btn" onclick="window.invoiceParser.removeItem(this)">Eliminar</button></td>
         `;
-    
+        
+        window.excelDb.createSelectsForRow(newRow);
         // Insertar la nueva fila antes de la fila de totales si existe
         const totalRow = document.getElementById('totalRow');
         if (totalRow) {

@@ -144,96 +144,89 @@ class ExcelExporter {
 
     async exportERP() {
         try {
-            const arrayBuffer = await this.fetchTemplate('plantillas/Plantilla_ERP.xlsx');
+            // Cargar la nueva plantilla que solo tiene la hoja MACRO ORACLE
+            const arrayBuffer = await this.fetchTemplate('plantillas/Plantilla_Oracle.xlsx');
             const workbook = await XlsxPopulate.fromDataAsync(arrayBuffer);
-            const sheet = workbook.sheet(0);
+            const sheet = workbook.sheet('MACRO ORACLE');
             const formData = window.invoiceParser.collectFormData();
-
-            // Obtener solo los códigos/valores de los campos select
-            const condicionPagoValue = document.getElementById('condicionPago').value.split('-')[0].trim();
-            const tipoFacturaValue = document.getElementById('tipoFactura').value.split('-')[0].trim();
-            const cuentaContableValue = document.getElementById('cuentaContable').value.split('-')[0].trim();
-            const porcentajeDetraccionValue = document.getElementById('porcentajeDetraccion').value.split('-')[0].trim();
-            const codigoBienValue = document.getElementById('codigoBien').value.split('-')[0].trim();
-
-            // Start from row 9 (after header)
-            const startRow = 9;
+    
+            // Función auxiliar para formatear fecha en español
+            const formatDateToSpanish = (dateStr) => {
+                const date = new Date(dateStr);
+                const months = ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC'];
+                return `${date.getDate()} ${months[date.getMonth()]}`;
+            };
+    
+            // Obtener fecha actual en Lima, Perú
+            const today = new Date();
+            const limaDate = new Date(today.toLocaleString("en-US", {timeZone: "America/Lima"}));
+    
+            // Extraer la segunda parte del número de factura
+            const facturaNum = formData.basic.numeroComprobante.split('-')[1] || '';
+            
+            // Construir la descripción base
+            const baseDescription = `FE/${facturaNum}, ${formData.basic.descripcion}, ${formatDateToSpanish(formData.basic.fechaEmision)}`;
+    
+            // Procesar cada línea de item
             formData.items.forEach((item, index) => {
-                const row = startRow + index;
+                const rowNum = 9 + index; // Empezar desde la fila 9
+    
+                // Columnas fijas
+                sheet.cell(`E${rowNum}`).value('1');
+                sheet.cell(`F${rowNum}`).value('UNIVERSIDAD ESAN BU');
+                sheet.cell(`G${rowNum}`).value('EYARASCA');
                 
-                // Map data to correct columns starting from column C
-                const rowData = {
-                    A: '', // Dejar vacío como en la plantilla original
-                    B: 'PE', // País por defecto
-                    C: formData.basic.numeroComprobante, // Identificador de cabecera de factura
-                    D: 'UNIVERSIDAD ESAN BU', // Unidad de negocio
-                    E: 'EYARASCA', // Juego de importación
-                    F: formData.basic.numeroComprobante, // Número de factura
-                    G: formData.basic.moneda, // Moneda de factura
-                    H: formData.basic.importe, // Importe de factura
-                    I: formData.basic.fechaEmision, // Fecha de factura
-                    J: formData.basic.razonSocial, // Proveedor
-                    K: formData.basic.ruc, // Número de proveedor
-                    L: 'SOLES-NACIONAL', // Sitio de proveedor
-                    M: formData.basic.moneda, // Moneda de pago
-                    N: tipoFacturaValue, // Tipo de factura (nuevo campo)
-                    O: formData.basic.descripcion, // Descripción
-                    P: cuentaContableValue, // Cuenta contable (nuevo campo)
-                    Q: condicionPagoValue, // Condición de pago (nuevo campo)
-                    R: codigoBienValue, // Código de bien detracción (nuevo campo)
-                    S: porcentajeDetraccionValue, // Porcentaje detracción (nuevo campo)
-                    // ... mantener otros campos existentes
-                    AA: (index + 1).toString(), // Línea
-                    AB: 'Ítem', // Tipo
-                    AC: item.importe, // Importe
-                    AD: item.centroCosto || '', // Combinación de distribución
-                    AE: item.lineaNegocio || '', // Línea de negocio
-                    AF: item.proyecto || '', // Proyecto
-                    // ... mantener otros campos específicos del item ...
-                    AK: 'PE_IGV_NREC_18', // Código de clasificación de impuestos
-                    BQ: 'DET12' // Categoría comercial de transacción
-                };
-
-                // Fill each cell in the row
-                Object.entries(rowData).forEach(([col, value]) => {
-                    if (value !== undefined && value !== null && value !== '') {
-                        // Formatear fechas si es necesario
-                        if (col === 'I' && value) {
-                            const date = new Date(value);
-                            if (!isNaN(date.getTime())) {
-                                value = date.toISOString().split('T')[0];
-                            }
-                        }
-                        
-                        // Formatear números si es necesario
-                        if (['H', 'AC'].includes(col) && !isNaN(value)) {
-                            value = parseFloat(value).toFixed(2);
-                        }
-                        
-                        sheet.cell(`${col}${row}`).value(value);
-                    }
+                // Datos del formulario
+                sheet.cell(`H${rowNum}`).value(formData.basic.numeroComprobante);
+                sheet.cell(`I${rowNum}`).value(formData.basic.moneda);
+                sheet.cell(`J${rowNum}`).value(parseFloat(formData.basic.importe));
+                sheet.cell(`K${rowNum}`).value(formData.basic.fechaEmision);
+                sheet.cell(`L${rowNum}`).value(formData.basic.razonSocial);
+                sheet.cell(`M${rowNum}`).value(formData.basic.ruc);
+                sheet.cell(`N${rowNum}`).value(''); // Sitio de Proveedor vacío
+                sheet.cell(`O${rowNum}`).value(''); // Moneda de Pago vacío
+                sheet.cell(`Q${rowNum}`).value(baseDescription);
+                sheet.cell(`S${rowNum}`).value(formData.basic.condicionPago);
+                
+                // Fechas actuales
+                sheet.cell(`W${rowNum}`).value(limaDate);
+                sheet.cell(`X${rowNum}`).value(limaDate);
+                
+                // Valores fijos y fechas adicionales
+                sheet.cell(`AG${rowNum}`).value('TC Venta');
+                
+                // Formatear fecha de cambio al formato dd/mm/yyyy
+                const fechaEmision = new Date(formData.basic.fechaEmision);
+                const fechaCambioFormateada = fechaEmision.toLocaleDateString('es-PE', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric'
                 });
+                sheet.cell(`AH${rowNum}`).value(fechaCambioFormateada);
+                
+                sheet.cell(`BW${rowNum}`).value('Peru');
+                sheet.cell(`BX${rowNum}`).value(''); // Información Adicional vacío
+                
+                // Datos de línea
+                sheet.cell(`CA${rowNum}`).value(index + 1);
+                sheet.cell(`CB${rowNum}`).value('Ítem');
+                sheet.cell(`CC${rowNum}`).value(parseFloat(item.importe));
+                sheet.cell(`CG${rowNum}`).value(baseDescription);
+                sheet.cell(`CS${rowNum}`).value(''); // Combinación de Distribución vacío
             });
-
-            // Aplicar formato a la hoja
-            // Establecer anchos de columna
-            ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S'].forEach(col => {
-                sheet.column(col).width(15);
-            });
-
-            // Formatear encabezados
-            for (let col = 1; col <= 19; col++) {
-                const cell = sheet.cell(`${String.fromCharCode(64 + col)}8`);
-                cell.style('bold', true)
-                    .style('fill', 'F2F2F2')
-                    .style('horizontalAlignment', 'center');
-            }
-
+    
+            // Determinar el nombre del archivo
+            const fileInput = document.getElementById('xmlFile');
+            let fileName = fileInput.files[0] 
+                ? `Formato_ERP_${fileInput.files[0].name.replace('.xml', '')}.xlsx`
+                : 'Formato_ERP.xlsx';
+    
+            // Exportar el archivo
             const blob = await workbook.outputAsync();
-            this.createTemporaryDownload('ERP_Modificado.xlsx', blob);
+            this.createTemporaryDownload(fileName, blob);
         } catch (error) {
             console.error('Error in exportERP:', error);
-            alert('Error: ' + error.message);
+            alert('Error al exportar: ' + error.message);
         }
     }
 

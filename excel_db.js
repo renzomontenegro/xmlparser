@@ -17,10 +17,217 @@ class ExcelDatabase {
             this.data.codDetraccion = this.loadSheetData(workbook.sheet('CodDetracción'), 'Código', 'Detalle');
             this.data.cuentasContables = this.loadSheetData(workbook.sheet('CContables'), 'Cuenta', 'Descripción');
             this.data.tipoFactura = this.loadSheetData(workbook.sheet('TipoFac'), 'Tipo', 'Detalle');
+            const ccosSheet = workbook.sheet('CCOs');
+            this.ccosData = this.loadCCOsData(ccosSheet);
 
             this.initializeSelectors();
         } catch (error) {
             console.error('Error loading Excel data:', error);
+        }
+    }
+
+    loadCCOsData(sheet) {
+        const data = {
+            lineasNegocio: new Set(),
+            centrosCosto: new Map(), // Map de línea de negocio a centros de costo
+            proyectos: new Map(), // Map de centro de costo a proyectos
+            descripcionesCC: new Map() // Map de centro de costo a descripción
+        };
+
+        let row = 2;
+        while (sheet.cell(`B${row}`).value()) {
+            const descripcion = sheet.cell(`B${row}`).value();
+            const lineaNegocio = sheet.cell(`C${row}`).value();
+            const centroCosto = sheet.cell(`D${row}`).value();
+            const proyecto = sheet.cell(`E${row}`).value();
+
+            if (lineaNegocio) {
+                // Agregar línea de negocio
+                data.lineasNegocio.add(lineaNegocio);
+
+                // Asociar centro de costo con línea de negocio
+                if (!data.centrosCosto.has(lineaNegocio)) {
+                    data.centrosCosto.set(lineaNegocio, new Set());
+                }
+                if (centroCosto) {
+                    data.centrosCosto.get(lineaNegocio).add(centroCosto);
+                    data.descripcionesCC.set(centroCosto, descripcion);
+                }
+
+                // Asociar proyecto con centro de costo
+                if (centroCosto && proyecto) {
+                    if (!data.proyectos.has(centroCosto)) {
+                        data.proyectos.set(centroCosto, new Set());
+                    }
+                    data.proyectos.get(centroCosto).add(proyecto);
+                }
+            }
+            row++;
+        }
+
+        return data;
+    }
+
+    createSelectsForRow(row) {
+        // Crear selects para línea de negocio
+        const tdLineaNegocio = row.cells[3];
+        const selectLN = document.createElement('select');
+        selectLN.className = 'item-lineaNegocio';
+        selectLN.innerHTML = '<option value="">Seleccione línea de negocio...</option>';
+        this.ccosData.lineasNegocio.forEach(ln => {
+            selectLN.add(new Option(ln, ln));
+        });
+
+        // Crear búsqueda para centro de costo
+        const tdCentroCosto = row.cells[4];
+        const containerCC = document.createElement('div');
+        containerCC.className = 'search-container';
+        const searchCC = document.createElement('input');
+        searchCC.type = 'text';
+        searchCC.className = 'item-centroCosto-search';
+        searchCC.placeholder = 'Buscar centro de costo...';
+        searchCC.disabled = true;
+        const hiddenCC = document.createElement('input');
+        hiddenCC.type = 'hidden';
+        hiddenCC.className = 'item-centroCosto';
+        const optionsCC = document.createElement('div');
+        optionsCC.className = 'select-options';
+
+        // Crear select para proyecto
+        const tdProyecto = row.cells[5];
+        const selectProyecto = document.createElement('select');
+        selectProyecto.className = 'item-proyecto';
+        selectProyecto.disabled = true;
+        selectProyecto.innerHTML = '<option value="">Seleccione proyecto...</option>';
+
+        // Eventos
+        selectLN.addEventListener('change', () => {
+            const lineaNegocio = selectLN.value;
+            searchCC.disabled = !lineaNegocio;
+            searchCC.value = '';
+            hiddenCC.value = '';
+            selectProyecto.innerHTML = '<option value="">Seleccione proyecto...</option>';
+            selectProyecto.disabled = true;
+
+            if (lineaNegocio) {
+                searchCC.disabled = false;
+            }
+        });
+
+        // Mostrar opciones al hacer focus o click
+        searchCC.addEventListener('focus', () => {
+            if (!searchCC.disabled) {
+                showCentroCostoOptions();
+            }
+        });
+
+        searchCC.addEventListener('click', () => {
+            if (!searchCC.disabled) {
+                showCentroCostoOptions();
+            }
+        });
+
+        // Cerrar al hacer click fuera
+        document.addEventListener('click', (e) => {
+            if (!searchCC.contains(e.target) && !optionsCC.contains(e.target)) {
+                optionsCC.style.display = 'none';
+            }
+        });
+
+        // Función para mostrar las opciones de Centro de Costo
+        const showCentroCostoOptions = () => {
+            const lineaNegocio = selectLN.value;
+            const searchTerm = searchCC.value.toLowerCase();
+            optionsCC.innerHTML = '';
+
+            if (lineaNegocio && this.ccosData.centrosCosto.has(lineaNegocio)) {
+                const centrosCosto = Array.from(this.ccosData.centrosCosto.get(lineaNegocio));
+                const filteredCC = searchTerm ? 
+                    centrosCosto.filter(cc => {
+                        const descripcion = this.ccosData.descripcionesCC.get(cc) || '';
+                        return cc.toLowerCase().includes(searchTerm) || 
+                               descripcion.toLowerCase().includes(searchTerm);
+                    }) : centrosCosto;
+
+                filteredCC.forEach(cc => {
+                    const option = document.createElement('div');
+                    option.className = 'select-option';
+                    const descripcion = this.ccosData.descripcionesCC.get(cc) || '';
+                    option.textContent = `${cc} - ${descripcion}`;
+                    option.dataset.value = cc;
+                    
+                    option.addEventListener('click', () => {
+                        searchCC.value = option.textContent;
+                        hiddenCC.value = cc;
+                        optionsCC.style.display = 'none';
+                        this.updateProyectos(selectProyecto, cc);
+                    });
+                    
+                    optionsCC.appendChild(option);
+                });
+                
+                optionsCC.style.display = 'block';
+            }
+        };
+
+        // Implementar búsqueda de centro de costo
+        searchCC.addEventListener('input', () => {
+            const searchTerm = searchCC.value.toLowerCase();
+            const lineaNegocio = selectLN.value;
+            optionsCC.innerHTML = '';
+
+            if (lineaNegocio && this.ccosData.centrosCosto.has(lineaNegocio)) {
+                const centrosCosto = Array.from(this.ccosData.centrosCosto.get(lineaNegocio));
+                const filteredCC = centrosCosto.filter(cc => {
+                    const descripcion = this.ccosData.descripcionesCC.get(cc) || '';
+                    return cc.toLowerCase().includes(searchTerm) || 
+                           descripcion.toLowerCase().includes(searchTerm);
+                });
+
+                filteredCC.forEach(cc => {
+                    const option = document.createElement('div');
+                    option.className = 'select-option';
+                    const descripcion = this.ccosData.descripcionesCC.get(cc) || '';
+                    option.textContent = `${cc} - ${descripcion}`;
+                    option.dataset.value = cc;
+                    
+                    option.addEventListener('click', () => {
+                        searchCC.value = option.textContent;
+                        hiddenCC.value = cc;
+                        optionsCC.style.display = 'none';
+                        this.updateProyectos(selectProyecto, cc);
+                    });
+                    
+                    optionsCC.appendChild(option);
+                });
+                
+                optionsCC.style.display = filteredCC.length ? 'block' : 'none';
+            }
+        });
+
+        // Reemplazar contenido de las celdas
+        tdLineaNegocio.innerHTML = '';
+        tdLineaNegocio.appendChild(selectLN);
+
+        tdCentroCosto.innerHTML = '';
+        containerCC.appendChild(searchCC);
+        containerCC.appendChild(hiddenCC);
+        containerCC.appendChild(optionsCC);
+        tdCentroCosto.appendChild(containerCC);
+
+        tdProyecto.innerHTML = '';
+        tdProyecto.appendChild(selectProyecto);
+    }
+
+    updateProyectos(selectProyecto, centroCosto) {
+        selectProyecto.innerHTML = '<option value="">Seleccione proyecto...</option>';
+        selectProyecto.disabled = !centroCosto;
+
+        if (centroCosto && this.ccosData.proyectos.has(centroCosto)) {
+            const proyectos = Array.from(this.ccosData.proyectos.get(centroCosto));
+            proyectos.forEach(proyecto => {
+                selectProyecto.add(new Option(proyecto, proyecto));
+            });
         }
     }
 
