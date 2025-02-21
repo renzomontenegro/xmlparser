@@ -29,42 +29,42 @@ class ExcelDatabase {
     loadCCOsData(sheet) {
         const data = {
             lineasNegocio: new Set(),
-            centrosCosto: new Map(), // Map de línea de negocio a centros de costo
-            proyectos: new Map(), // Map de centro de costo a proyectos
-            descripcionesCC: new Map() // Map de centro de costo a descripción
+            centrosCosto: new Map(),
+            proyectos: new Map(),
+            descripcionesCC: new Map(),
+            ccosAntiguos: new Map()
         };
-
+    
         let row = 2;
         while (sheet.cell(`B${row}`).value()) {
-            const descripcion = sheet.cell(`B${row}`).value();
-            const lineaNegocio = sheet.cell(`C${row}`).value();
-            const centroCosto = sheet.cell(`D${row}`).value();
-            const proyecto = sheet.cell(`E${row}`).value();
-
+            const descripcion = sheet.cell(`B${row}`).value()?.toString() || '';
+            const lineaNegocio = sheet.cell(`C${row}`).value()?.toString() || '';
+            const centroCosto = sheet.cell(`D${row}`).value()?.toString() || '';
+            const proyecto = sheet.cell(`E${row}`).value()?.toString() || '';
+            const ccoAntiguo = sheet.cell(`F${row}`).value()?.toString() || '';
+    
             if (lineaNegocio) {
-                // Agregar línea de negocio
                 data.lineasNegocio.add(lineaNegocio);
-
-                // Asociar centro de costo con línea de negocio
+    
                 if (!data.centrosCosto.has(lineaNegocio)) {
                     data.centrosCosto.set(lineaNegocio, new Set());
                 }
                 if (centroCosto) {
                     data.centrosCosto.get(lineaNegocio).add(centroCosto);
                     data.descripcionesCC.set(centroCosto, descripcion);
-                }
-
-                // Asociar proyecto con centro de costo
-                if (centroCosto && proyecto) {
-                    if (!data.proyectos.has(centroCosto)) {
-                        data.proyectos.set(centroCosto, new Set());
+                    data.ccosAntiguos.set(centroCosto, ccoAntiguo);
+    
+                    if (proyecto) {
+                        if (!data.proyectos.has(centroCosto)) {
+                            data.proyectos.set(centroCosto, new Set());
+                        }
+                        data.proyectos.get(centroCosto).add(proyecto);
                     }
-                    data.proyectos.get(centroCosto).add(proyecto);
                 }
             }
             row++;
         }
-
+    
         return data;
     }
 
@@ -139,25 +139,40 @@ class ExcelDatabase {
             const lineaNegocio = selectLN.value;
             const searchTerm = searchCC.value.toLowerCase();
             optionsCC.innerHTML = '';
-
+        
             if (lineaNegocio && this.ccosData.centrosCosto.has(lineaNegocio)) {
                 const centrosCosto = Array.from(this.ccosData.centrosCosto.get(lineaNegocio));
                 const filteredCC = searchTerm ? 
                     centrosCosto.filter(cc => {
                         const descripcion = this.ccosData.descripcionesCC.get(cc) || '';
+                        const ccoAntiguo = this.ccosData.ccosAntiguos.get(cc) || '';
                         return cc.toLowerCase().includes(searchTerm) || 
-                               descripcion.toLowerCase().includes(searchTerm);
+                               descripcion.toLowerCase().includes(searchTerm) ||
+                               ccoAntiguo.toLowerCase().includes(searchTerm);
                     }) : centrosCosto;
-
+        
                 filteredCC.forEach(cc => {
                     const option = document.createElement('div');
                     option.className = 'select-option';
-                    const descripcion = this.ccosData.descripcionesCC.get(cc) || '';
-                    option.textContent = `${cc} - ${descripcion}`;
+                    
+                    // Crear estructura para el contenido
+                    const mainContent = document.createElement('span');
+                    mainContent.className = 'cc-main-content';
+                    mainContent.textContent = `${cc} - ${this.ccosData.descripcionesCC.get(cc) || ''}`;
+                    
+                    const antiguoContent = document.createElement('span');
+                    antiguoContent.className = 'cc-antiguo';
+                    const ccoAntiguo = this.ccosData.ccosAntiguos.get(cc);
+                    if (ccoAntiguo) {
+                        antiguoContent.textContent = ` - ${ccoAntiguo}`;
+                    }
+                    
+                    option.appendChild(mainContent);
+                    option.appendChild(antiguoContent);
                     option.dataset.value = cc;
                     
                     option.addEventListener('click', () => {
-                        searchCC.value = option.textContent;
+                        searchCC.value = `${cc} - ${this.ccosData.descripcionesCC.get(cc) || ''}`;
                         hiddenCC.value = cc;
                         optionsCC.style.display = 'none';
                         this.updateProyectos(selectProyecto, cc);
@@ -171,39 +186,57 @@ class ExcelDatabase {
         };
 
         // Implementar búsqueda de centro de costo
-        searchCC.addEventListener('input', () => {
-            const searchTerm = searchCC.value.toLowerCase();
-            const lineaNegocio = selectLN.value;
-            optionsCC.innerHTML = '';
+searchCC.addEventListener('input', () => {
+    const searchTerm = searchCC.value.toLowerCase();
+    const lineaNegocio = selectLN.value;
+    optionsCC.innerHTML = '';
 
-            if (lineaNegocio && this.ccosData.centrosCosto.has(lineaNegocio)) {
-                const centrosCosto = Array.from(this.ccosData.centrosCosto.get(lineaNegocio));
-                const filteredCC = centrosCosto.filter(cc => {
-                    const descripcion = this.ccosData.descripcionesCC.get(cc) || '';
-                    return cc.toLowerCase().includes(searchTerm) || 
-                           descripcion.toLowerCase().includes(searchTerm);
-                });
+    if (lineaNegocio && this.ccosData.centrosCosto.has(lineaNegocio)) {
+        const centrosCosto = Array.from(this.ccosData.centrosCosto.get(lineaNegocio));
+        const filteredCC = centrosCosto.filter(cc => {
+            // Asegurarnos de que todos los valores existan y sean strings
+            const ccLower = (cc || '').toString().toLowerCase();
+            const descripcion = (this.ccosData.descripcionesCC.get(cc) || '').toString().toLowerCase();
+            const ccoAntiguo = (this.ccosData.ccosAntiguos.get(cc) || '').toString().toLowerCase();
 
-                filteredCC.forEach(cc => {
-                    const option = document.createElement('div');
-                    option.className = 'select-option';
-                    const descripcion = this.ccosData.descripcionesCC.get(cc) || '';
-                    option.textContent = `${cc} - ${descripcion}`;
-                    option.dataset.value = cc;
-                    
-                    option.addEventListener('click', () => {
-                        searchCC.value = option.textContent;
-                        hiddenCC.value = cc;
-                        optionsCC.style.display = 'none';
-                        this.updateProyectos(selectProyecto, cc);
-                    });
-                    
-                    optionsCC.appendChild(option);
-                });
-                
-                optionsCC.style.display = filteredCC.length ? 'block' : 'none';
-            }
+            return ccLower.includes(searchTerm) || 
+                   descripcion.includes(searchTerm) ||
+                   ccoAntiguo.includes(searchTerm);
         });
+
+        filteredCC.forEach(cc => {
+            const option = document.createElement('div');
+            option.className = 'select-option';
+            
+            // Crear estructura para el contenido
+            const mainContent = document.createElement('span');
+            mainContent.className = 'cc-main-content';
+            mainContent.textContent = `${cc} - ${this.ccosData.descripcionesCC.get(cc) || ''}`;
+            
+            const antiguoContent = document.createElement('span');
+            antiguoContent.className = 'cc-antiguo';
+            const ccoAntiguo = this.ccosData.ccosAntiguos.get(cc);
+            if (ccoAntiguo) {
+                antiguoContent.textContent = ` - ${ccoAntiguo}`;
+            }
+            
+            option.appendChild(mainContent);
+            option.appendChild(antiguoContent);
+            option.dataset.value = cc;
+            
+            option.addEventListener('click', () => {
+                searchCC.value = `${cc} - ${this.ccosData.descripcionesCC.get(cc) || ''}`;
+                hiddenCC.value = cc;
+                optionsCC.style.display = 'none';
+                this.updateProyectos(selectProyecto, cc);
+            });
+            
+            optionsCC.appendChild(option);
+        });
+        
+        optionsCC.style.display = filteredCC.length ? 'block' : 'none';
+    }
+});
 
         // Reemplazar contenido de las celdas
         tdLineaNegocio.innerHTML = '';
