@@ -14,11 +14,9 @@ class ExcelExporter {
         return arrayBuffer;
     }
 
-    async exportSolicitud() {
+    async exportSolicitud(options = {}) {
         try {
-            const fileInput = document.getElementById('xmlFile');
-            let fileName = fileInput.files[0] ? fileInput.files[0].name.replace('.xml', '') : 'Sin_Archivo';
-    
+            const formData = window.invoiceParser.collectFormData();
             const workbook = await XlsxPopulate.fromBlankAsync();
             const sheet = workbook.sheet(0);
     
@@ -36,27 +34,27 @@ class ExcelExporter {
     
             let currentRow = 2;
             
-            // Encabezado con nombre del archivo
-            setBold(sheet.cell('A' + currentRow)).value(`Información de la Factura ${fileName}`);
+            // Encabezado con número de comprobante
+            setBold(sheet.cell('A' + currentRow)).value(`Información de la Factura ${formData.basic.numeroComprobante}`);
             currentRow += 2;
     
-            // Obtener solo los códigos/valores de los campos select
-            const condicionPagoValue = document.getElementById('condicionPago').value.split('-')[0].trim();
-            const codDetraccionValue = document.getElementById('codigoBien').value.split('-')[0].trim();
-            const porcentajeDetraccionValue = document.getElementById('porcentajeDetraccion').value.split('-')[0].trim();
-            const cuentaContableValue = document.getElementById('cuentaContable').value.split('-')[0].trim();
-            const tipoFacturaValue = document.getElementById('tipoFactura').value.split('-')[0].trim();
-
+            // Obtener valores de los campos select (mantener la descripción completa)
+            const condicionPagoValue = document.getElementById('condicionPago').value;
+            const codDetraccionValue = document.getElementById('codigoBien').value;
+            const porcentajeDetraccionValue = document.getElementById('porcentajeDetraccion').value;
+            const cuentaContableValue = document.getElementById('cuentaContableSearch').value;
+            const tipoFacturaValue = document.getElementById('tipoFactura').value;
+    
             // Datos básicos actualizado con nuevos campos
             const basicInfo = [
-                { label: 'RUC:', value: document.getElementById('ruc').value },
-                { label: 'Razón Social:', value: document.getElementById('razonSocial').value },
-                { label: 'Moneda:', value: document.getElementById('moneda').value },
-                { label: 'Fecha Emisión:', value: document.getElementById('fechaEmision').value },
-                { label: 'N° Comprobante:', value: document.getElementById('numeroComprobante').value },
-                { label: 'Importe Total (Con IGV):', value: document.getElementById('importe').value },
+                { label: 'RUC:', value: formData.basic.ruc },
+                { label: 'Razón Social:', value: formData.basic.razonSocial },
+                { label: 'Moneda:', value: formData.basic.moneda },
+                { label: 'Fecha Emisión:', value: formData.basic.fechaEmision },
+                { label: 'N° Comprobante:', value: formData.basic.numeroComprobante },
+                { label: 'Importe Total (Con IGV):', value: formData.basic.importe },
                 { label: 'Condición de Pago:', value: condicionPagoValue },
-                { label: 'Fecha Vencimiento:', value: document.getElementById('fechaVencimiento').value },
+                { label: 'Fecha Vencimiento:', value: formData.basic.fechaVencimiento },
                 { label: 'Cuenta Contable:', value: cuentaContableValue },
                 { label: 'Tipo de Factura:', value: tipoFacturaValue }
             ];
@@ -100,7 +98,6 @@ class ExcelExporter {
             });
             currentRow++;
     
-            const formData = window.invoiceParser.collectFormData();
             let sumBaseImponible = 0;
             let sumPorcentaje = 0;
     
@@ -135,98 +132,103 @@ class ExcelExporter {
             setRight(sheet.cell('B' + currentRow)).value(importeTotal.toFixed(2));
     
             const blob = await workbook.outputAsync();
-            this.createTemporaryDownload(`Información_Factura_${fileName}.xlsx`, blob);
+            
+            if (options?.returnBlob) {
+                return blob;
+            }
+    
+            // Nombre del archivo con número de comprobante
+            const fileName = `Resumen-Factura-${formData.basic.numeroComprobante}.xlsx`;
+            this.createTemporaryDownload(fileName, blob);
         } catch (error) {
             console.error('Error in exportSolicitud:', error);
             alert('Error al exportar: ' + error.message);
+            throw error;
         }
     }
 
-    async exportERP() {
+    async exportERP(options = {}) {
         try {
-            // Cargar la nueva plantilla que solo tiene la hoja MACRO ORACLE
             const arrayBuffer = await this.fetchTemplate('plantillas/Plantilla_Oracle.xlsx');
             const workbook = await XlsxPopulate.fromDataAsync(arrayBuffer);
             const sheet = workbook.sheet('MACRO ORACLE');
             const formData = window.invoiceParser.collectFormData();
     
-            // Función auxiliar para formatear fecha en español
-            const formatDateToSpanish = (dateStr) => {
-                const date = new Date(dateStr);
-                const months = ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC'];
-                return `${date.getDate()} ${months[date.getMonth()]}`;
+            // Funciones de formateo de fecha
+            const formatDate = (dateStr) => {
+                const [year, month, day] = dateStr.split('-');
+                return `${day}/${month}/${year}`;
             };
     
-            // Obtener fecha actual en Lima, Perú
-            const today = new Date();
-            const limaDate = new Date(today.toLocaleString("en-US", {timeZone: "America/Lima"}));
+            const formatDateToSpanish = (dateStr) => {
+                const [year, month, day] = dateStr.split('-');
+                const months = ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC'];
+                return `${parseInt(day)} ${months[parseInt(month) - 1]}`;
+            };
     
-            // Extraer la segunda parte del número de factura
-            const facturaNum = formData.basic.numeroComprobante.split('-')[1] || '';
+            // Formatear fechas
+            const fechaEmisionFormateada = formatDate(formData.basic.fechaEmision);
             
-            // Construir la descripción base
+            // Obtener fecha actual formateada
+            const today = new Date();
+            const formattedToday = today.toLocaleDateString('es-PE', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+            });
+    
+            // Extraer número de factura y construir descripción
+            const facturaNum = formData.basic.numeroComprobante.split('-')[1] || '';
             const baseDescription = `FE/${facturaNum}, ${formData.basic.descripcion}, ${formatDateToSpanish(formData.basic.fechaEmision)}`;
     
             // Procesar cada línea de item
             formData.items.forEach((item, index) => {
-                const rowNum = 9 + index; // Empezar desde la fila 9
+                const rowNum = 9 + index;
     
-                // Columnas fijas
                 sheet.cell(`E${rowNum}`).value('1');
                 sheet.cell(`F${rowNum}`).value('UNIVERSIDAD ESAN BU');
                 sheet.cell(`G${rowNum}`).value('EYARASCA');
-                
-                // Datos del formulario
                 sheet.cell(`H${rowNum}`).value(formData.basic.numeroComprobante);
                 sheet.cell(`I${rowNum}`).value(formData.basic.moneda);
                 sheet.cell(`J${rowNum}`).value(parseFloat(formData.basic.importe));
-                sheet.cell(`K${rowNum}`).value(formData.basic.fechaEmision);
+                sheet.cell(`K${rowNum}`).value(fechaEmisionFormateada);
                 sheet.cell(`L${rowNum}`).value(formData.basic.razonSocial);
                 sheet.cell(`M${rowNum}`).value(formData.basic.ruc);
-                sheet.cell(`N${rowNum}`).value(''); // Sitio de Proveedor vacío
-                sheet.cell(`O${rowNum}`).value(''); // Moneda de Pago vacío
+                sheet.cell(`N${rowNum}`).value('');
+                sheet.cell(`O${rowNum}`).value('');
+                sheet.cell(`P${rowNum}`).value('Estándar');
                 sheet.cell(`Q${rowNum}`).value(baseDescription);
                 sheet.cell(`S${rowNum}`).value(formData.basic.condicionPago);
                 
                 // Fechas actuales
-                sheet.cell(`W${rowNum}`).value(limaDate);
-                sheet.cell(`X${rowNum}`).value(limaDate);
+                sheet.cell(`W${rowNum}`).value(formattedToday);
+                sheet.cell(`X${rowNum}`).value(formattedToday);
                 
-                // Valores fijos y fechas adicionales
                 sheet.cell(`AG${rowNum}`).value('TC Venta');
-                
-                // Formatear fecha de cambio al formato dd/mm/yyyy
-                const fechaEmision = new Date(formData.basic.fechaEmision);
-                const fechaCambioFormateada = fechaEmision.toLocaleDateString('es-PE', {
-                    day: '2-digit',
-                    month: '2-digit',
-                    year: 'numeric'
-                });
-                sheet.cell(`AH${rowNum}`).value(fechaCambioFormateada);
+                sheet.cell(`AH${rowNum}`).value(fechaEmisionFormateada);
                 
                 sheet.cell(`BW${rowNum}`).value('Peru');
-                sheet.cell(`BX${rowNum}`).value(''); // Información Adicional vacío
+                sheet.cell(`BX${rowNum}`).value('');
                 
-                // Datos de línea
                 sheet.cell(`CA${rowNum}`).value(index + 1);
                 sheet.cell(`CB${rowNum}`).value('Ítem');
                 sheet.cell(`CC${rowNum}`).value(parseFloat(item.importe));
                 sheet.cell(`CG${rowNum}`).value(baseDescription);
-                sheet.cell(`CS${rowNum}`).value(''); // Combinación de Distribución vacío
+                sheet.cell(`CS${rowNum}`).value('');
             });
     
-            // Determinar el nombre del archivo
-            const fileInput = document.getElementById('xmlFile');
-            let fileName = fileInput.files[0] 
-                ? `Formato_ERP_${fileInput.files[0].name.replace('.xml', '')}.xlsx`
-                : 'Formato_ERP.xlsx';
-    
-            // Exportar el archivo
             const blob = await workbook.outputAsync();
+            
+            if (options?.returnBlob) {
+                return blob;
+            }
+    
+            const fileName = `Formato_ERP_${formData.basic.numeroComprobante}.xlsx`;
             this.createTemporaryDownload(fileName, blob);
         } catch (error) {
             console.error('Error in exportERP:', error);
             alert('Error al exportar: ' + error.message);
+            throw error;
         }
     }
 
@@ -244,3 +246,196 @@ class ExcelExporter {
 
 // Create global instance
 window.excelExporter = new ExcelExporter();
+
+
+/*Exportación en JSON*/ 
+
+// Añadir esta clase al final de xml_parser.js
+
+class FormStorage {
+    constructor() {
+        this.initializeEventListeners();
+    }
+
+    initializeEventListeners() {
+        document.getElementById('saveFormBtn').addEventListener('click', () => this.saveForm());
+        document.getElementById('jsonFile').addEventListener('change', (e) => this.loadForm(e));
+    }
+
+    async saveForm() {
+        try {
+            // Recolectar todos los datos del formulario
+            const formData = window.invoiceParser.collectFormData();
+
+            // Obtener solo el código del tipo de factura
+            const tipoFacturaValue = document.getElementById('tipoFactura').value;
+            formData.tipoFactura = tipoFacturaValue.split('-')[0].trim();
+            
+            // Agregar datos adicionales que no están en collectFormData
+            const additionalFields = [
+                'numeroComprobanteParte1',
+                'numeroComprobanteParte2',
+                'cuentaContableSearch',
+                'tipoFactura'
+            ];
+
+            additionalFields.forEach(fieldId => {
+                const element = document.getElementById(fieldId);
+                if (element) {
+                    formData[fieldId] = element.value;
+                }
+            });
+
+            // Convertir a JSON y crear blob
+            const jsonString = JSON.stringify(formData, null, 2);
+            const blob = new Blob([jsonString], { type: 'application/json' });
+
+            // Generar nombre de archivo basado en el número de comprobante o fecha
+            const comprobante = formData.basic.numeroComprobante || 'formulario';
+            const fecha = new Date().toISOString().split('T')[0];
+            const fileName = `${comprobante}_${fecha}.json`;
+
+            // Crear y activar enlace de descarga
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+
+            //alert('Formulario guardado exitosamente');
+        } catch (error) {
+            console.error('Error saving form:', error);
+            alert('Error al guardar el formulario: ' + error.message);
+        }
+    }
+
+    async loadForm(event) {
+        try {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const text = await file.text();
+            const formData = JSON.parse(text);
+
+            // Cargar datos básicos sin limpiar el formulario
+            Object.entries(formData.basic).forEach(([key, value]) => {
+                const element = document.getElementById(key);
+                if (element) element.value = value;
+            });
+
+            // Cargar datos adicionales
+            if (formData.numeroComprobanteParte1) {
+                document.getElementById('numeroComprobanteParte1').value = formData.numeroComprobanteParte1;
+            }
+            if (formData.numeroComprobanteParte2) {
+                document.getElementById('numeroComprobanteParte2').value = formData.numeroComprobanteParte2;
+            }
+            if (formData.cuentaContableSearch) {
+                document.getElementById('cuentaContableSearch').value = formData.cuentaContableSearch;
+            }
+
+            // Limpiar solo la tabla de items
+            const tbody = document.getElementById('itemsTableBody');
+            if (tbody) {
+                tbody.innerHTML = '';
+            }
+
+            // Cargar items uno por uno
+            if (formData.items && Array.isArray(formData.items)) {
+                formData.items.forEach((item, index) => {
+                    // Crear nueva fila
+                    const newRow = document.createElement('tr');
+                    newRow.innerHTML = `
+                        <td>${index + 1}</td>
+                        <td><input type="number" step="0.01" class="item-importe" value="${item.importe}" placeholder="Monto sin IGV"></td>
+                        <td><input type="number" step="0.01" class="item-porcentaje" value="${item.porcentaje}" placeholder="%"></td>
+                        <td><input type="text" class="item-lineaNegocio" value="${item.lineaNegocio}"></td>
+                        <td><input type="text" class="item-centroCosto" value="${item.centroCosto}"></td>
+                        <td><input type="text" class="item-proyecto" value="${item.proyecto}"></td>
+                        <td><button type="button" class="remove-btn" onclick="window.invoiceParser.removeItem(this)">Eliminar</button></td>
+                    `;
+
+                    // Añadir la fila a la tabla
+                    tbody.appendChild(newRow);
+
+                    // Crear selects para la nueva fila
+                    window.excelDb.createSelectsForRow(newRow);
+
+                    // Establecer valores en los selectores customizados
+                    setTimeout(() => {
+                        // Línea de Negocio
+                        const lineaNegocioSelect = newRow.querySelector('.item-lineaNegocio');
+                        if (lineaNegocioSelect && item.lineaNegocio) {
+                            lineaNegocioSelect.value = item.lineaNegocio;
+                            
+                            // Habilitar y establecer Centro de Costo
+                            const centroCostoSearch = newRow.querySelector('.item-centroCosto-search');
+                            const centroCostoHidden = newRow.querySelector('.item-centroCosto');
+                            if (centroCostoSearch && centroCostoHidden && item.centroCosto) {
+                                centroCostoSearch.disabled = false;
+                                const descripcionCC = window.excelDb.ccosData.descripcionesCC.get(item.centroCosto) || '';
+                                centroCostoSearch.value = `${item.centroCosto} - ${descripcionCC}`;
+                                centroCostoHidden.value = item.centroCosto;
+                                
+                                // Habilitar y establecer Proyecto
+                                const proyectoSelect = newRow.querySelector('.item-proyecto');
+                                if (proyectoSelect && item.proyecto) {
+                                    proyectoSelect.disabled = false;
+                                    if (window.excelDb.ccosData.proyectos.has(item.centroCosto)) {
+                                        const proyectos = Array.from(window.excelDb.ccosData.proyectos.get(item.centroCosto));
+                                        proyectoSelect.innerHTML = '<option value="">Seleccione proyecto...</option>';
+                                        proyectos.forEach(proyecto => {
+                                            proyectoSelect.add(new Option(proyecto, proyecto));
+                                        });
+                                        proyectoSelect.value = item.proyecto;
+                                    }
+                                }
+                            }
+                        }
+                    }, 100);
+
+                    // Añadir event listeners para cálculos
+                    const importeInput = newRow.querySelector('.item-importe');
+                    const porcentajeInput = newRow.querySelector('.item-porcentaje');
+                    
+                    if (importeInput && porcentajeInput) {
+                        importeInput.addEventListener('change', () => window.invoiceParser.updateTotalsAndReferences());
+                        porcentajeInput.addEventListener('change', () => window.invoiceParser.updateTotalsAndReferences());
+                    }
+                });
+            }
+
+            // Cargar tipo de factura correctamente
+            if (formData.tipoFactura) {
+                const tipoFacturaSelect = document.getElementById('tipoFactura');
+                // Buscar la opción que empiece con el código guardado
+                const options = Array.from(tipoFacturaSelect.options);
+                const matchingOption = options.find(option => 
+                    option.value.startsWith(formData.tipoFactura + ' -') || 
+                    option.value === formData.tipoFactura
+                );
+                if (matchingOption) {
+                    tipoFacturaSelect.value = matchingOption.value;
+                }
+            }
+
+            // Actualizar cálculos y referencias
+            window.invoiceParser.updateTotalsAndReferences();
+            window.invoiceParser.updateCreditDays();
+
+            // Limpiar el input de archivo para permitir cargar el mismo archivo nuevamente
+            event.target.value = '';
+            //alert('Formulario cargado exitosamente');
+        } catch (error) {
+            console.error('Error loading form:', error);
+            alert('Error al cargar el formulario: ' + error.message);
+        }
+    }
+}
+
+// Crear instancia global
+window.formStorage = new FormStorage();
+

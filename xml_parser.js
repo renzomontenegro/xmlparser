@@ -178,11 +178,34 @@ class InvoiceParser {
         // Aquí puedes agregar la lógica para enviar los datos
     }
 
+    getInvoiceId(xmlDoc) {
+        const cbcIdElements = xmlDoc.getElementsByTagNameNS("urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2", "ID");
+        
+        // Buscar el ID que es hijo directo de Invoice
+        for (let element of cbcIdElements) {
+            if (element.parentNode.localName === "Invoice") {
+                return element.textContent.trim();
+            }
+        }
+        
+        return '';
+    }
+
     parseInvoiceXML(xmlDoc) {
         try {
             // Usar el nuevo método para obtener el ID
             const invoiceId = this.getInvoiceId(xmlDoc);
             
+            // Separar el ID en las dos partes requeridas
+            let parte1 = '', parte2 = '';
+            if (invoiceId) {
+                const parts = invoiceId.split('-');
+                if (parts.length === 2) {
+                    parte1 = parts[0]; // Ejemplo: E001 o F002
+                    parte2 = parts[1]; // Parte numérica
+                }
+            }
+
             // Obtener el importe total correcto con IGV
             let importe = this.getElementValue(xmlDoc, "TaxInclusiveAmount");
             if (!importe) {
@@ -194,18 +217,18 @@ class InvoiceParser {
                 razonSocial: this.getElementValue(xmlDoc, "RegistrationName"),
                 moneda: this.standardizeCurrency(this.getElementValue(xmlDoc, "DocumentCurrencyCode")),
                 fechaEmision: this.getElementValue(xmlDoc, "IssueDate"),
-                numeroComprobante: '',
+                numeroComprobanteParte1: parte1,
+                numeroComprobanteParte2: parte2,
+                numeroComprobante: invoiceId,
                 importe: importe,
-                fechaVencimiento: this.getElementValue(xmlDoc, "DueDate"),
                 solicitante: '',
                 descripcion: '',
-                //codigoBien: '',
-                //porcentajeDetraccion: this.getDetractionPercentage(xmlDoc),
                 fechaInicioLicencia: '',
                 fechaFinLicencia: '',
                 areaSolicitante: '',
                 items: []
             };
+
         } catch (error) {
             console.error('Error parsing XML:', error);
             throw new Error('Failed to parse XML invoice');
@@ -314,7 +337,8 @@ class InvoiceParser {
             'porcentajeDetraccion',
             'codigoBien',
             'cuentaContable',
-            'tipoFactura'
+            'tipoFactura',
+            'fechaVencimiento'
         ];
 
         // Poblar solo los campos que no están en la lista de exclusión
@@ -323,6 +347,17 @@ class InvoiceParser {
                 const element = document.getElementById(key);
                 if (element) element.value = value;
             }
+        }
+
+        // Manejar específicamente el número de comprobante
+        if (data.numeroComprobanteParte1) {
+            document.getElementById('numeroComprobanteParte1').value = data.numeroComprobanteParte1;
+        }
+        if (data.numeroComprobanteParte2) {
+            document.getElementById('numeroComprobanteParte2').value = data.numeroComprobanteParte2;
+        }
+        if (data.numeroComprobante) {
+            document.getElementById('numeroComprobante').value = data.numeroComprobante;
         }
 
         // Limpiar items existentes y agregar nueva fila

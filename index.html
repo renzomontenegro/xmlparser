@@ -6,15 +6,24 @@
     <title>Procesador de Facturas XML</title>
     <link rel="stylesheet" href="style.css">
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
-    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>  
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
 <body>
     <div class="container">
-        <div class="upload-section">
-            <h2>Procesador de Facturas XML</h2>
-            <p>Sube un archivo XML o completa el formulario manualmente</p>
-            <input type="file" id="xmlFile" accept=".xml">
-            <button type="button" id="clearFormBtn" style="margin: 10px 0px;">Limpiar Todo</button>
+        <div class="form-header">
+            <div class="upload-section primary">
+                <h2>Procesador de Facturas XML</h2>
+                <p>Sube un archivo XML o completa el formulario manualmente</p>
+                <input type="file" id="xmlFile" accept=".xml">
+                <button type="button" id="clearFormBtn" style="margin: 10px 0px;">Limpiar Todo</button>
+            </div>
+            
+            <div class="upload-section secondary">
+                <h2>Sube aquí un JSON</h2>
+                <p>Carga un formulario previamente hecho, en formato JSON</p>
+                <input type="file" id="jsonFile" accept=".json">
+            </div>
         </div>
 
         <form id="invoiceForm">
@@ -159,11 +168,19 @@
             </div>
 
             <div style="text-align: center; margin-top: 20px;">
-                <button type="button" id="exportSolicitudBtn" style="margin: 0 10px; background-color: #28a745;">
-                    Exportar en Plantilla Solicitud de Ingreso de Facturas
+                <button type="button" id="exportSolicitudBtn" style="margin: 0 10px; background-color: #005a15;">
+                    Exportar Resumen para Aprobación
                 </button>
-                <button type="button" id="exportERPBtn" style="margin: 0 10px; background-color: #28a745;">
+                <button type="button" id="exportERPBtn" style="margin: 0 10px; background-color: #005e16;">
                     Exportar en formato ERP
+                </button>
+                <button type="button" id="saveFormBtn" style="margin: 0 10px; background-color: #bb6a00;">
+                    Exportar en JSON
+                </button>
+            </div>
+            <div class="centrar" style="margin-top: 20px;">
+                <button type="button" id="downloadAllBtn" style="margin: 0 10px; background-color: #0105ff;">
+                    Descargar Todo
                 </button>
             </div>
         </form>
@@ -174,5 +191,6 @@
     <script src="xml_parser.js"></script>
     <script src="exportacion.js"></script>
     <script src="excel_db.js"></script>
+    <script src="export_all.js"></script>  
 </body>
 </html>
