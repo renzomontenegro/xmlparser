@@ -234,6 +234,24 @@ class ExcelExporter {
                 sheet.cell(`CC${rowNum}`).value(parseFloat(item.importe));
                 sheet.cell(`CG${rowNum}`).value(baseDescription);
                 sheet.cell(`CS${rowNum}`).value('');
+
+                // Obtener el código de detracción y asegurar valor por defecto
+                const codigoDetraccion = (document.getElementById('codigoBien').value.split(' - ')[0] || '').padStart(3, '0');
+                
+                // Formatear Información Adicional - usar puntos si faltan valores
+                const infoAdicional = `01....5.01.${codigoDetraccion || '.'}.......`;
+
+                // Obtener valores con fallback a punto
+                const cuentaContable = formData.cuentaContableSearch || '.';
+                const lineaNegocio = item.lineaNegocio || '.';
+                const centroCosto = item.centroCosto || '.';
+                const proyecto = item.proyecto || '.';
+                
+                // Formatear Combinación de Distribución
+                const combinacionDistribucion = `E1.${cuentaContable}.${lineaNegocio}.${centroCosto}.${proyecto}.U00.00.00`;
+
+                sheet.cell(`BX${rowNum}`).value(infoAdicional);
+                sheet.cell(`CS${rowNum}`).value(combinacionDistribucion);
             });
     
             const blob = await workbook.outputAsync();
