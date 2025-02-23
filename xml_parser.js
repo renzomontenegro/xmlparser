@@ -7,6 +7,7 @@ class InvoiceParser {
         };
         this.initializeEventListeners();
         this.initializeComprobanteFormat();
+        this.initializeRucValidation();
     }
 
     initializeEventListeners() {
@@ -115,6 +116,27 @@ class InvoiceParser {
         });
     }
 
+    initializeRucValidation() {
+        const rucInput = document.getElementById('ruc');
+        
+        // Prevenir entrada de caracteres no numéricos
+        rucInput.addEventListener('keypress', (e) => {
+            if (!/^\d$/.test(e.key)) {
+                e.preventDefault();
+                return;
+            }
+            // Prevenir si ya tiene 11 dígitos
+            if (rucInput.value.length >= 11) {
+                e.preventDefault();
+            }
+        });
+
+        // Limpiar caracteres no numéricos en caso de pegar texto
+        rucInput.addEventListener('input', () => {
+            rucInput.value = rucInput.value.replace(/\D/g, '').slice(0, 11);
+        });
+    }
+
     getInvoiceId(xmlDoc) {
         // Primero intentamos obtener el ID directamente bajo Invoice
         let id = null;
@@ -199,7 +221,7 @@ class InvoiceParser {
     handleFormSubmit(event) {
         event.preventDefault();
         const formData = this.collectFormData();
-        console.log('Form data:', formData);
+        //console.log('Form data:', formData);
         // Aquí puedes agregar la lógica para enviar los datos
     }
 
@@ -235,6 +257,15 @@ class InvoiceParser {
                 }
             }
 
+            // Obtener el importe total con IGV
+        let importe = this.getElementValue(xmlDoc, "TaxInclusiveAmount");
+        if (!importe) {
+            importe = this.getElementValue(xmlDoc, "PayableAmount");
+        }
+
+        console.log("Importe capturado del XML:", importe);
+        console.log("Tipo de dato del importe:", typeof importe);
+
             // Resto de la lógica para obtener otros campos...
             const result = {
                 ruc: this.getElementValue(xmlDoc, "ID", xmlDoc.querySelector("*|AccountingSupplierParty")),
@@ -243,7 +274,8 @@ class InvoiceParser {
                 fechaEmision: this.getElementValue(xmlDoc, "IssueDate"),
                 numeroComprobanteParte1: parte1,
                 numeroComprobanteParte2: parte2,
-                numeroComprobante: `${parte1}-${parte2}`, // Usar las partes procesadas
+                numeroComprobante: `${parte1}-${parte2}`,
+                importe: this.getElementValue(xmlDoc, "PayableAmount") || this.getElementValue(xmlDoc, "TaxInclusiveAmount"), // Agregar esta línea
                 solicitante: '',
                 descripcion: '',
                 fechaInicioLicencia: '',
