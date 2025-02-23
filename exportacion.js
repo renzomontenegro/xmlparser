@@ -43,7 +43,7 @@ class ExcelExporter {
             const condicionPagoValue = document.getElementById('condicionPago').value;
             const codDetraccionValue = document.getElementById('codigoBien').value;
             const porcentajeDetraccionValue = document.getElementById('porcentajeDetraccion').value;
-            const cuentaContableValue = document.getElementById('cuentaContableSearch').value;
+            const cuentaContableValue = document.getElementById('cuentaContableSearch').value.split(' - ')[0];
             const tipoFacturaValue = document.getElementById('tipoFactura').value;
     
             // Datos básicos actualizado con nuevos campos
@@ -131,6 +131,13 @@ class ExcelExporter {
     
             setBold(sheet.cell('A' + currentRow)).value('Importe CON IGV:');
             setRight(sheet.cell('B' + currentRow)).value(importeTotal.toFixed(2));
+
+            // Agregar otros cargos si existen
+            if (formData.otrosCargos) {
+                currentRow++;
+                setBold(sheet.cell('A' + currentRow)).value('Otros Cargos:');
+                setRight(sheet.cell('B' + currentRow)).value(parseFloat(formData.otrosCargos.monto).toFixed(2));
+            }
     
             const blob = await workbook.outputAsync();
             
@@ -188,8 +195,13 @@ class ExcelExporter {
             const facturaNum = formData.basic.numeroComprobante.split('-')[1] || '';
             const baseDescription = `FE/${facturaNum}, ${formData.basic.descripcion}, ${formatDateToSpanish(formData.basic.fechaEmision)}`;
     
-            // Procesar cada línea de item
-            formData.items.forEach((item, index) => {
+            // Procesar items normales y otros cargos
+            let allItems = [...formData.items];
+            if (formData.otrosCargos) {
+                allItems = allItems.concat(formData.otrosCargos.items);
+            }
+
+            allItems.forEach((item, index) => {
                 const rowNum = 9 + index;
     
                 sheet.cell(`E${rowNum}`).value('1');
@@ -290,9 +302,12 @@ class FormStorage {
             // Recolectar todos los datos del formulario
             const formData = window.invoiceParser.collectFormData();
 
-            // Obtener solo el código del tipo de factura
+            // Obtener solo el código del tipo de factura y cuenta contable
             const tipoFacturaValue = document.getElementById('tipoFactura').value;
+            const cuentaContableValue = document.getElementById('cuentaContableSearch').value;
+            
             formData.tipoFactura = tipoFacturaValue.split('-')[0].trim();
+            formData.cuentaContableSearch = cuentaContableValue.split(' - ')[0].trim();
             
             // Agregar datos adicionales que no están en collectFormData
             const additionalFields = [
@@ -308,6 +323,19 @@ class FormStorage {
                     formData[fieldId] = element.value;
                 }
             });
+
+            // Añadir console.log para debuggear
+            console.log('Cuenta contable original:', document.getElementById('cuentaContableSearch').value);
+            console.log('Cuenta contable después del split:', formData.cuentaContableSearch);
+
+            // Obtener el valor directamente desde excelDb
+            const cuentaContableFullValue = document.getElementById('cuentaContableSearch').value;
+            const cuentaContableCodigo = cuentaContableFullValue.split(' - ')[0].trim();
+            
+            // Sobrescribir el valor para asegurarnos que solo tenga el código
+            formData.cuentaContableSearch = cuentaContableCodigo;
+
+            console.log('Cuenta contable final:', formData.cuentaContableSearch);
 
             // Convertir a JSON y crear blob
             const jsonString = JSON.stringify(formData, null, 2);
@@ -443,6 +471,11 @@ class FormStorage {
                 if (matchingOption) {
                     tipoFacturaSelect.value = matchingOption.value;
                 }
+            }
+
+            // Cargar el valor de otros cargos si existe
+            if (formData.otrosCargos && formData.otrosCargos.monto) {
+                document.getElementById('otrosCargos').value = formData.otrosCargos.monto;
             }
 
             // Actualizar cálculos y referencias

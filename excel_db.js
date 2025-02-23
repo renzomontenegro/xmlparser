@@ -362,8 +362,13 @@ initializeSearchableSelect(elementId, data) {
                 option.textContent = item.label;
                 
                 option.addEventListener('click', () => {
-                    searchInput.value = item.label;
-                    hiddenInput.value = item.value;
+                    const codigo = item.value; // Este es el código sin descripción
+                    const descripcion = item.label; // Este es el valor completo
+                    console.log('Código seleccionado:', codigo);
+                    console.log('Descripción completa:', descripcion);
+                    
+                    searchInput.value = descripcion;
+                    hiddenInput.value = codigo; // Guardamos solo el código en el input hidden
                     optionsContainer.classList.remove('active');
                 });
                 

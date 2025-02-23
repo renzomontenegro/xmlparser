@@ -8,6 +8,8 @@ class InvoiceParser {
         this.initializeEventListeners();
         this.initializeComprobanteFormat();
         this.initializeRucValidation();
+        this.otrosCargosList = []; // Añadir esta propiedad
+        this.initializeNewFields();
     }
 
     initializeEventListeners() {
@@ -440,11 +442,11 @@ class InvoiceParser {
         const newRow = document.createElement('tr');
         newRow.innerHTML = `
             <td>${rowIndex}</td>
-            <td><input type="number" step="0.01" class="item-importe" value="" placeholder="Monto sin IGV"></td>
-            <td><input type="number" step="0.01" class="item-porcentaje" value="" placeholder="%"></td>
-            <td><input type="text" class="item-lineaNegocio" value=""></td>
-            <td><input type="text" class="item-centroCosto" value=""></td>
-            <td><input type="text" class="item-proyecto" value=""></td>
+            <td><input type="number" step="0.01" class="item-importe" value="${itemData?.importe || ''}" placeholder="Monto sin IGV"></td>
+            <td><input type="number" step="0.01" class="item-porcentaje" value="${itemData?.porcentaje || ''}" placeholder="%"></td>
+            <td><input type="text" class="item-lineaNegocio" value="${itemData?.lineaNegocio || ''}"></td>
+            <td><input type="text" class="item-centroCosto" value="${itemData?.centroCosto || ''}"></td>
+            <td><input type="text" class="item-proyecto" value="${itemData?.proyecto || ''}"></td>
             <td><button type="button" class="remove-btn" onclick="window.invoiceParser.removeItem(this)">Eliminar</button></td>
         `;
         
@@ -537,6 +539,14 @@ class InvoiceParser {
             <td colspan="5"></td>
         `;
         tbody.appendChild(importeConIGVRow);
+
+        // Después de actualizar los totales, actualizar otros cargos si existe un valor
+        const otrosCargos = parseFloat(document.getElementById('otrosCargos').value);
+        if (!isNaN(otrosCargos) && otrosCargos > 0) {
+            // Obtener items actuales después de la actualización
+            const itemsActuales = Array.from(document.querySelectorAll('#itemsTableBody tr:not(.total-row):not([id])'));
+            this.updateOtrosCargosList(itemsActuales, otrosCargos);
+        }
     }
 
 
@@ -672,14 +682,15 @@ class InvoiceParser {
                     const lineaNegocioInput = row.querySelector('.item-lineaNegocio');
                     const centroCostoInput = row.querySelector('.item-centroCosto');
                     const proyectoInput = row.querySelector('.item-proyecto');
-    
+                    const centroCosto = centroCostoInput?.value?.split(' - ')[0] || '';
+
                     if (importeInput) { // Si existe el input de importe, es una fila de item válida
                         const item = {
                             numeroItem: formData.items.length + 1,
                             importe: importeInput.value || '0',
                             porcentaje: porcentajeInput?.value || '0',
                             lineaNegocio: lineaNegocioInput?.value || '',
-                            centroCosto: centroCostoInput?.value || '',
+                            centroCosto: centroCosto,
                             proyecto: proyectoInput?.value || ''
                         };
                         formData.items.push(item);
@@ -687,8 +698,104 @@ class InvoiceParser {
                 }
             }
         }
+
+        // Agregar otros cargos si existen
+        if (this.otrosCargosList.length > 0) {
+            formData.otrosCargos = {
+                monto: document.getElementById('otrosCargos').value,
+                items: this.otrosCargosList
+            };
+        }
+
+        // Extraer solo el código de la cuenta contable
+        const cuentaContableValue = document.getElementById('cuentaContableSearch').value;
+        formData.cuentaContableSearch = cuentaContableValue.split(' - ')[0];
     
         return formData;
+    }
+
+    initializeNewFields() {
+        const cantidadItemsInput = document.getElementById('cantidadItems');
+        const otrosCargosInput = document.getElementById('otrosCargos');
+        const accordionToggle = document.querySelector('.accordion-toggle');
+
+        // Manejar el acordeón
+        accordionToggle.addEventListener('click', () => {
+            const content = document.querySelector('.accordion-content');
+            content.classList.toggle('active');
+            accordionToggle.textContent = content.classList.contains('active') ? 
+                'Opciones adicionales ▼' : 'Opciones adicionales ▶';
+        });
+
+        cantidadItemsInput.addEventListener('input', () => this.handleCantidadItemsChange());
+        otrosCargosInput.addEventListener('input', () => this.handleOtrosCargosChange());
+    }
+
+    handleCantidadItemsChange() {
+        const cantidadItems = parseInt(document.getElementById('cantidadItems').value);
+        if (!cantidadItems || isNaN(cantidadItems)) return;
+
+        this.clearItems(); // Limpiar items existentes
+        const importeTotal = parseFloat(document.getElementById('importe').value) || 0;
+        const importeSinIGV = importeTotal / 1.18;
+        const porcentajePorItem = 100 / cantidadItems;
+        const importePorItem = (importeSinIGV * porcentajePorItem / 100).toFixed(2);
+
+        for (let i = 0; i < cantidadItems; i++) {
+            this.addNewItem({
+                importe: importePorItem,
+                porcentaje: porcentajePorItem.toFixed(2)
+            });
+        }
+
+        // Actualizar otros cargos después de crear los nuevos items
+        this.handleOtrosCargosChange();
+    }
+
+    handleOtrosCargosChange() {
+        const otrosCargos = parseFloat(document.getElementById('otrosCargos').value);
+        if (!otrosCargos || isNaN(otrosCargos)) {
+            this.otrosCargosList = [];
+            return;
+        }
+
+        const itemsActuales = Array.from(document.querySelectorAll('#itemsTableBody tr:not(.total-row):not([id])'));
+        
+        this.otrosCargosList = itemsActuales.map(row => {
+            const porcentaje = parseFloat(row.querySelector('.item-porcentaje').value) || 0;
+            const importeProporcional = (otrosCargos * porcentaje / 100).toFixed(2);
+            
+            // Obtener los valores reales de los selectores
+            const lineaNegocioSelect = row.querySelector('.item-lineaNegocio');
+            const centroCostoSearch = row.querySelector('.item-centroCosto-search');
+            const centroCostoHidden = row.querySelector('.item-centroCosto');
+            const proyectoSelect = row.querySelector('.item-proyecto');
+            
+            return {
+                importe: importeProporcional,
+                porcentaje: porcentaje,
+                lineaNegocio: lineaNegocioSelect?.value || '',
+                centroCosto: centroCostoHidden?.value || '', // Usar el valor del input hidden que tiene solo el código
+                proyecto: proyectoSelect?.value || ''
+            };
+        });
+        
+        console.log('Lista actualizada de otros cargos:', this.otrosCargosList);
+    }
+
+    updateOtrosCargosList(items, otrosCargos) {
+        this.otrosCargosList = items.map(row => {
+            const porcentaje = parseFloat(row.querySelector('.item-porcentaje').value) || 0;
+            const importeProporcional = (otrosCargos * porcentaje / 100).toFixed(2);
+            
+            return {
+                importe: importeProporcional,
+                porcentaje: porcentaje,
+                lineaNegocio: row.querySelector('.item-lineaNegocio').value,
+                centroCosto: row.querySelector('.item-centroCosto')?.value?.split(' - ')[0] || '',
+                proyecto: row.querySelector('.item-proyecto').value
+            };
+        });
     }
 }
 

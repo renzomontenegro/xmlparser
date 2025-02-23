@@ -512,3 +512,42 @@ tr:not(.reference-row):not(.total-row):hover {
     justify-content: center;
     align-items: center;
 }
+
+/* ... existing code ... */
+
+.optional-fields-accordion {
+    margin: 20px 0;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.accordion-toggle {
+    width: 100%;
+    padding: 10px;
+    background-color: #f8f9fa;
+    border: none;
+    text-align: left;
+    cursor: pointer;
+    color: black;
+}
+
+.accordion-toggle:hover {
+    background-color: #e9ecef;
+}
+
+.accordion-content {
+    display: none;
+    padding: 15px;
+}
+
+.accordion-content.active {
+    display: block;
+}
+
+.optional-fields-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+/* ... rest of the code ... */
