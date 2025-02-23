@@ -261,11 +261,21 @@ window.excelExporter = new ExcelExporter();
 
 class FormStorage {
     constructor() {
-        this.initializeEventListeners();
+        this.initializeFormStorageEvents();
     }
 
-    initializeEventListeners() {
-        document.getElementById('saveFormBtn').addEventListener('click', () => this.saveForm());
+    initializeFormStorageEvents() {
+        // Solo manejar el evento de saveFormBtn aquí
+        document.getElementById('saveFormBtn').addEventListener('click', (e) => {
+            e.preventDefault();
+            const form = document.getElementById('invoiceForm');
+            if (form.checkValidity()) {
+                this.saveForm();
+            } else {
+                form.reportValidity();
+            }
+        });
+        
         document.getElementById('jsonFile').addEventListener('change', (e) => this.loadForm(e));
     }
 

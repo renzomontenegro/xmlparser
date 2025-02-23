@@ -29,7 +29,7 @@ class InvoiceParser {
         };
 
         // Simplificar el manejo de eventos de los botones
-        ['exportSolicitudBtn', 'exportERPBtn', 'saveFormBtn', 'downloadAllBtn'].forEach(btnId => {
+        ['exportSolicitudBtn', 'exportERPBtn', 'downloadAllBtn'].forEach(btnId => { // Remover 'saveFormBtn' de aquí
             document.getElementById(btnId).addEventListener('click', (e) => {
                 e.preventDefault();
                 const form = document.getElementById('invoiceForm');
@@ -41,9 +41,6 @@ class InvoiceParser {
                             break;
                         case 'exportERPBtn':
                             window.excelExporter.exportERP();
-                            break;
-                        case 'saveFormBtn':
-                            window.formStorage.saveForm();
                             break;
                         case 'downloadAllBtn':
                             window.exportAll.downloadAll();
@@ -478,14 +475,14 @@ class InvoiceParser {
         const importeInput = newRow.querySelector('.item-importe');
         const porcentajeInput = newRow.querySelector('.item-porcentaje');
     
-        porcentajeInput.addEventListener('change', () => {
+        porcentajeInput.addEventListener('input', () => {
             const porcentaje = parseFloat(porcentajeInput.value) || 0;
             const nuevoImporte = (importeSinIGV * porcentaje / 100);
             importeInput.value = nuevoImporte.toFixed(2);
             this.updateTotalsAndReferences();
         });
     
-        importeInput.addEventListener('change', () => {
+        importeInput.addEventListener('input', () => {
             const importe = parseFloat(importeInput.value) || 0;
             const nuevoPorcentaje = (importe / importeSinIGV * 100);
             porcentajeInput.value = nuevoPorcentaje.toFixed(2);
