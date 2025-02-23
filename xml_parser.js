@@ -218,7 +218,6 @@ class InvoiceParser {
     handleFormSubmit(event) {
         event.preventDefault();
         const formData = this.collectFormData();
-        //console.log('Form data:', formData);
         // Aquí puedes agregar la lógica para enviar los datos
     }
 
@@ -238,30 +237,23 @@ class InvoiceParser {
     parseInvoiceXML(xmlDoc) {
         try {
             const invoiceId = this.getInvoiceId(xmlDoc);
-            console.log('Invoice ID original:', invoiceId);
             
             let parte1 = '', parte2 = '';
             if (invoiceId) {
                 const parts = invoiceId.split('-');
-                console.log('Parts split:', parts);
                 
                 if (parts.length === 2) {
                     parte1 = parts[0];
                     // Limpiar y rellenar con ceros
                     parte2 = parts[1].replace(/\D/g, '').padStart(8, '0');
-                    console.log('Parte1:', parte1);
-                    console.log('Parte2 (después de pad):', parte2);
                 }
             }
 
             // Obtener el importe total con IGV
-        let importe = this.getElementValue(xmlDoc, "TaxInclusiveAmount");
-        if (!importe) {
-            importe = this.getElementValue(xmlDoc, "PayableAmount");
-        }
-
-        console.log("Importe capturado del XML:", importe);
-        console.log("Tipo de dato del importe:", typeof importe);
+            let importe = this.getElementValue(xmlDoc, "TaxInclusiveAmount");
+            if (!importe) {
+                importe = this.getElementValue(xmlDoc, "PayableAmount");
+            }
 
             // Resto de la lógica para obtener otros campos...
             const result = {
@@ -272,7 +264,7 @@ class InvoiceParser {
                 numeroComprobanteParte1: parte1,
                 numeroComprobanteParte2: parte2,
                 numeroComprobante: `${parte1}-${parte2}`,
-                importe: this.getElementValue(xmlDoc, "PayableAmount") || this.getElementValue(xmlDoc, "TaxInclusiveAmount"), // Agregar esta línea
+                importe: this.getElementValue(xmlDoc, "PayableAmount") || this.getElementValue(xmlDoc, "TaxInclusiveAmount"),
                 solicitante: '',
                 descripcion: '',
                 fechaInicioLicencia: '',
@@ -281,7 +273,6 @@ class InvoiceParser {
                 items: []
             };
 
-            console.log('Resultado final parseInvoiceXML:', result);
             return result;
 
         } catch (error) {
@@ -386,8 +377,6 @@ class InvoiceParser {
     }
 
     populateForm(data) {
-        console.log('Datos recibidos en populateForm:', data);
-        
         // Crear una lista de campos que NO deben ser autocompletados
         const excludeFields = [
             'condicionPago',
@@ -409,16 +398,13 @@ class InvoiceParser {
         // Manejar específicamente el número de comprobante
         if (data.numeroComprobanteParte1) {
             document.getElementById('numeroComprobanteParte1').value = data.numeroComprobanteParte1;
-            console.log('Estableciendo parte1:', data.numeroComprobanteParte1);
         }
         if (data.numeroComprobanteParte2) {
             const parte2 = data.numeroComprobanteParte2.padStart(8, '0');
             document.getElementById('numeroComprobanteParte2').value = parte2;
-            console.log('Estableciendo parte2:', parte2);
         }
         if (data.numeroComprobante) {
             document.getElementById('numeroComprobante').value = data.numeroComprobante;
-            console.log('Estableciendo comprobante completo:', data.numeroComprobante);
         }
 
         // Limpiar items existentes y agregar nueva fila
