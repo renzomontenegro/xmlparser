@@ -16,77 +16,102 @@ class InvoiceParser {
         document.getElementById('fechaEmision').addEventListener('change', () => this.updateCreditDays());
         document.getElementById('fechaVencimiento').addEventListener('change', () => this.updateCreditDays());
         document.getElementById('clearFormBtn').addEventListener('click', () => this.clearForm());
+
+        // Nueva función de validación
+        const validateForm = () => {
+            const form = document.getElementById('invoiceForm');
+            if (!form.checkValidity()) {
+                form.reportValidity();
+                return false;
+            }
+            return true;
+        };
+
+        // Simplificar el manejo de eventos de los botones
+        ['exportSolicitudBtn', 'exportERPBtn', 'saveFormBtn', 'downloadAllBtn'].forEach(btnId => {
+            document.getElementById(btnId).addEventListener('click', (e) => {
+                e.preventDefault();
+                const form = document.getElementById('invoiceForm');
+                // Solo disparar la acción si el formulario es válido
+                if (form.checkValidity()) {
+                    switch(btnId) {
+                        case 'exportSolicitudBtn':
+                            window.excelExporter.exportSolicitud();
+                            break;
+                        case 'exportERPBtn':
+                            window.excelExporter.exportERP();
+                            break;
+                        case 'saveFormBtn':
+                            window.formStorage.saveForm();
+                            break;
+                        case 'downloadAllBtn':
+                            window.exportAll.downloadAll();
+                            break;
+                    }
+                } else {
+                    form.reportValidity();
+                }
+            });
+        });
     }
 
     initializeComprobanteFormat() {
         const parte1 = document.getElementById('numeroComprobanteParte1');
         const parte2 = document.getElementById('numeroComprobanteParte2');
         const numeroComprobanteCompleto = document.getElementById('numeroComprobante');
-    
-        // Crear tooltips para los mensajes de validación
-        const tooltip1 = document.createElement('div');
-        tooltip1.className = 'validation-tooltip';
-        const tooltip2 = document.createElement('div');
-        tooltip2.className = 'validation-tooltip';
-    
-        parte1.parentElement.appendChild(tooltip1);
-        parte2.parentElement.appendChild(tooltip2);
-    
+
         const handleParte1 = (input) => {
             // Limitar a 4 caracteres
             input.value = input.value.slice(0, 4);
-            
-            // Validar y mostrar mensaje
-            if (input.value.length < 4) {
-                tooltip1.textContent = `Faltan ${4 - input.value.length} dígitos`;
-                tooltip1.style.display = 'block';
-            } else {
-                tooltip1.style.display = 'none';
-            }
-    
             actualizarComprobanteCompleto();
         };
-    
-        const handleParte2 = (input) => {
-            // Solo permitir números y limitar a 8 dígitos
-            input.value = input.value.replace(/\D/g, '').slice(0, 8);
-            
-            // Validar y mostrar mensaje
-            if (input.value.length < 8) {
-                tooltip2.textContent = `Faltan ${8 - input.value.length} dígitos`;
-                tooltip2.style.display = 'block';
-            } else {
-                tooltip2.style.display = 'none';
+
+        // Nueva función para manejar parte2
+        const handleParte2KeyDown = (e) => {
+            // Solo permitir números y backspace
+            if (!((e.key >= '0' && e.key <= '9') || e.key === 'Backspace')) {
+                e.preventDefault();
+                return;
             }
-    
+            
+            let currentValue = parte2.value.replace(/[^1-9]/g, ''); // Solo considerar números no-cero
+            
+            if (e.key === 'Backspace') {
+                currentValue = currentValue.slice(0, -1);
+            } else {
+                if (currentValue.length >= 8 && e.key !== '0') {
+                    e.preventDefault();
+                    return;
+                }
+                currentValue = currentValue + e.key;
+            }
+            
+            // Rellenar con ceros a la izquierda
+            parte2.value = currentValue.padStart(8, '0');
             actualizarComprobanteCompleto();
+            
+            // Prevenir el comportamiento default
+            e.preventDefault();
         };
-    
+
+        // Inicializar parte2 con ceros
+        parte2.value = '00000000';
+
         const actualizarComprobanteCompleto = () => {
             numeroComprobanteCompleto.value = `${parte1.value}-${parte2.value}`;
         };
-    
+
         // Eventos para parte1
         parte1.addEventListener('input', () => handleParte1(parte1));
-        parte1.addEventListener('blur', () => {
-            if (parte1.value.length < 4) {
-                tooltip1.style.display = 'block';
-            }
-        });
-    
+
         // Eventos para parte2
-        parte2.addEventListener('input', () => handleParte2(parte2));
-        parte2.addEventListener('blur', () => {
-            if (parte2.value.length < 8) {
-                tooltip2.style.display = 'block';
-            }
-        });
-    
-        // Prevenir entrada de caracteres no numéricos SOLO para parte2
-        parte2.addEventListener('keypress', (e) => {
-            if (!/^\d$/.test(e.key)) {
-                e.preventDefault();
-            }
+        parte2.addEventListener('keydown', handleParte2KeyDown);
+
+        // Asegurar formato al cargar datos del XML
+        parte2.addEventListener('change', () => {
+            let value = parte2.value.replace(/[^0-9]/g, '');
+            parte2.value = value.padStart(8, '0');
+            actualizarComprobanteCompleto();
         });
     }
 
@@ -193,34 +218,32 @@ class InvoiceParser {
 
     parseInvoiceXML(xmlDoc) {
         try {
-            // Usar el nuevo método para obtener el ID
             const invoiceId = this.getInvoiceId(xmlDoc);
+            console.log('Invoice ID original:', invoiceId);
             
-            // Separar el ID en las dos partes requeridas
             let parte1 = '', parte2 = '';
             if (invoiceId) {
                 const parts = invoiceId.split('-');
+                console.log('Parts split:', parts);
+                
                 if (parts.length === 2) {
-                    parte1 = parts[0]; // Ejemplo: E001 o F002
-                    parte2 = parts[1]; // Parte numérica
+                    parte1 = parts[0];
+                    // Limpiar y rellenar con ceros
+                    parte2 = parts[1].replace(/\D/g, '').padStart(8, '0');
+                    console.log('Parte1:', parte1);
+                    console.log('Parte2 (después de pad):', parte2);
                 }
             }
 
-            // Obtener el importe total correcto con IGV
-            let importe = this.getElementValue(xmlDoc, "TaxInclusiveAmount");
-            if (!importe) {
-                importe = this.getElementValue(xmlDoc, "PayableAmount");
-            }
-    
-            return {
+            // Resto de la lógica para obtener otros campos...
+            const result = {
                 ruc: this.getElementValue(xmlDoc, "ID", xmlDoc.querySelector("*|AccountingSupplierParty")),
                 razonSocial: this.getElementValue(xmlDoc, "RegistrationName"),
                 moneda: this.standardizeCurrency(this.getElementValue(xmlDoc, "DocumentCurrencyCode")),
                 fechaEmision: this.getElementValue(xmlDoc, "IssueDate"),
                 numeroComprobanteParte1: parte1,
                 numeroComprobanteParte2: parte2,
-                numeroComprobante: invoiceId,
-                importe: importe,
+                numeroComprobante: `${parte1}-${parte2}`, // Usar las partes procesadas
                 solicitante: '',
                 descripcion: '',
                 fechaInicioLicencia: '',
@@ -228,6 +251,9 @@ class InvoiceParser {
                 areaSolicitante: '',
                 items: []
             };
+
+            console.log('Resultado final parseInvoiceXML:', result);
+            return result;
 
         } catch (error) {
             console.error('Error parsing XML:', error);
@@ -331,6 +357,8 @@ class InvoiceParser {
     }
 
     populateForm(data) {
+        console.log('Datos recibidos en populateForm:', data);
+        
         // Crear una lista de campos que NO deben ser autocompletados
         const excludeFields = [
             'condicionPago',
@@ -352,12 +380,16 @@ class InvoiceParser {
         // Manejar específicamente el número de comprobante
         if (data.numeroComprobanteParte1) {
             document.getElementById('numeroComprobanteParte1').value = data.numeroComprobanteParte1;
+            console.log('Estableciendo parte1:', data.numeroComprobanteParte1);
         }
         if (data.numeroComprobanteParte2) {
-            document.getElementById('numeroComprobanteParte2').value = data.numeroComprobanteParte2;
+            const parte2 = data.numeroComprobanteParte2.padStart(8, '0');
+            document.getElementById('numeroComprobanteParte2').value = parte2;
+            console.log('Estableciendo parte2:', parte2);
         }
         if (data.numeroComprobante) {
             document.getElementById('numeroComprobante').value = data.numeroComprobante;
+            console.log('Estableciendo comprobante completo:', data.numeroComprobante);
         }
 
         // Limpiar items existentes y agregar nueva fila

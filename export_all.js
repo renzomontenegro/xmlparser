@@ -8,6 +8,13 @@ class ExportAllManager {
     }
 
     async downloadAll() {
+        // Validar el formulario antes de proceder
+        const form = document.getElementById('invoiceForm');
+        if (!form.checkValidity()) {
+            form.reportValidity();
+            return; // Detener la ejecución si no es válido
+        }
+
         try {
             const zip = new JSZip();
             const timestamp = new Date().toISOString().replace(/[:.]/g, '-');

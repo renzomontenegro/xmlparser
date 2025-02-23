@@ -1,11 +1,6 @@
 class ExcelExporter {
     constructor() {
-        this.initializeEventListeners();
-    }
-
-    initializeEventListeners() {
-        document.getElementById('exportSolicitudBtn').addEventListener('click', () => this.exportSolicitud());
-        document.getElementById('exportERPBtn').addEventListener('click', () => this.exportERP());
+        // No necesitamos inicializar event listeners aquí
     }
 
     async fetchTemplate(templatePath) {
@@ -15,6 +10,12 @@ class ExcelExporter {
     }
 
     async exportSolicitud(options = {}) {
+        const form = document.getElementById('invoiceForm');
+        if (!form.checkValidity()) {
+            form.reportValidity();
+            return; // Detener la ejecución si no es válido
+        }
+
         try {
             const formData = window.invoiceParser.collectFormData();
             const workbook = await XlsxPopulate.fromBlankAsync();
@@ -148,6 +149,12 @@ class ExcelExporter {
     }
 
     async exportERP(options = {}) {
+        const form = document.getElementById('invoiceForm');
+        if (!form.checkValidity()) {
+            form.reportValidity();
+            return; // Detener la ejecución si no es válido
+        }
+
         try {
             const arrayBuffer = await this.fetchTemplate('plantillas/Plantilla_Oracle.xlsx');
             const workbook = await XlsxPopulate.fromDataAsync(arrayBuffer);
@@ -263,6 +270,12 @@ class FormStorage {
     }
 
     async saveForm() {
+        const form = document.getElementById('invoiceForm');
+        if (!form.checkValidity()) {
+            form.reportValidity();
+            return; // Detener la ejecución si no es válido
+        }
+
         try {
             // Recolectar todos los datos del formulario
             const formData = window.invoiceParser.collectFormData();

@@ -217,28 +217,6 @@ input[type="file"] {
 
 /*Alertas*/
 
-.validation-tooltip {
-    display: none;
-    position: absolute;
-    background-color: #dc3545;
-    color: white;
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 12px;
-    margin-top: -70px;
-    margin-left: -10px;
-    z-index: 1000;
-}
-
-.comprobante-container {
-    position: relative;
-}
-
-.comprobante-container input {
-    margin-bottom: 4px;
-}
-
-
 /* Searchable Select Styles */
 /* Agregar al style.css */
 .select-search {

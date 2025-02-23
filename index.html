@@ -31,7 +31,8 @@
                 <!-- Sección 1: Información básica -->
                 <div class="form-group">
                     <label for="ruc">RUC</label>
-                    <input type="text" id="ruc" name="ruc" required>
+                    <input type="text" id="ruc" name="ruc" pattern="^(10|20)\d{9}$" required 
+                           title="Ingrese un RUC válido (10 o 20 seguido de 9 dígitos)">
                 </div>
 
                 <div class="form-group">
@@ -62,13 +63,15 @@
                 <div class="form-group">
                     <label for="numeroComprobanteParte1">N° Comprobante de Pago</label>
                     <div class="comprobante-container">
-                        <input type="text" id="numeroComprobanteParte1" maxlength="4" required>
+                        <input type="text" id="numeroComprobanteParte1" maxlength="4" pattern="^[A-Za-z0-9]{4}$" required
+                               title="Debe contener exactamente 4 caracteres">
                         <span class="separator">-</span>
-                        <input type="text" id="numeroComprobanteParte2" maxlength="8" required>
+                        <input type="text" id="numeroComprobanteParte2" maxlength="8" pattern="^\d{8}$" required
+                               title="Debe contener 8 dígitos (use ceros a la izquierda si es necesario)">
                         <input type="hidden" id="numeroComprobante" name="numeroComprobante">
                     </div>
                     <small class="form-text text-muted">
-                        Formato: XXXX-XXXXXXXX (ejemplo: F001-00000123)
+                        Formato: XXXX-00000000 (ejemplo: F001-00000123)
                     </small>
                 </div>
 
