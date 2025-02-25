@@ -191,7 +191,7 @@ class ExcelExporter {
     
             // Extraer número de factura y construir descripción
             const facturaNum = formData.basic.numeroComprobante.split('-')[1] || '';
-            const baseDescription = `FE/${facturaNum}, ${formData.basic.descripcion}, ${formatDateToSpanish(formData.basic.fechaEmision)}`;
+            const baseDescription = `${formData.basic.razonSocial} ${formData.basic.descripcion}`;
     
             // Procesar items normales y otros cargos
             let allItems = [...formData.items];
@@ -237,7 +237,7 @@ class ExcelExporter {
                 const codigoDetraccion = (document.getElementById('codigoBien').value.split(' - ')[0] || '').padStart(3, '0');
                 
                 // Formatear Información Adicional - usar puntos si faltan valores
-                const infoAdicional = `01....5.01.${codigoDetraccion || '.'}.......`;
+                const infoAdicional = `..01....5.01.${codigoDetraccion || '.'}.......`;
 
                 // Obtener valores con fallback a punto
                 const cuentaContable = formData.cuentaContableSearch || '.';
