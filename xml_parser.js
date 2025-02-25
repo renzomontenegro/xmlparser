@@ -425,7 +425,7 @@ class InvoiceParser {
         const importeTotal = parseFloat(document.getElementById('importe').value) || 0;
         const importeSinIGV = importeTotal / 1.18;
         
-        // Obtener índice correcto contando solo las filas de items (no las de totales)
+        // Obtener índice correcto contando solo las filas de items
         const itemRows = tbody.querySelectorAll('tr:not(#totalRow):not(#importeSinIGVRow):not(#importeConIGVRow)');
         const rowIndex = itemRows.length + 1;
     
@@ -441,6 +441,7 @@ class InvoiceParser {
         `;
         
         window.excelDb.createSelectsForRow(newRow);
+        
         // Insertar la nueva fila antes de la fila de totales si existe
         const totalRow = document.getElementById('totalRow');
         if (totalRow) {
@@ -466,6 +467,16 @@ class InvoiceParser {
             porcentajeInput.value = nuevoPorcentaje.toFixed(2);
             this.updateTotalsAndReferences();
         });
+        
+        // NUEVO: Añadir evento de cambio para el selector de proyecto
+        const proyectoSelect = newRow.querySelector('.item-proyecto');
+        if (proyectoSelect) {
+            proyectoSelect.addEventListener('change', () => {
+                console.log(`Proyecto cambiado a: ${proyectoSelect.value}`);
+                // Actualizar otros cargos cuando cambia el proyecto
+                this.handleOtrosCargosChange();
+            });
+        }
     
         this.updateTotalsAndReferences();
     }
@@ -529,13 +540,12 @@ class InvoiceParser {
             <td colspan="5"></td>
         `;
         tbody.appendChild(importeConIGVRow);
-
+    
         // Después de actualizar los totales, actualizar otros cargos si existe un valor
         const otrosCargos = parseFloat(document.getElementById('otrosCargos').value);
         if (!isNaN(otrosCargos) && otrosCargos > 0) {
-            // Obtener items actuales después de la actualización
-            const itemsActuales = Array.from(document.querySelectorAll('#itemsTableBody tr:not(.total-row):not([id])'));
-            this.updateOtrosCargosList(itemsActuales, otrosCargos);
+            // Forzar una actualización completa de la lista de otros cargos
+            this.handleOtrosCargosChange();
         }
     }
 
@@ -641,7 +651,11 @@ class InvoiceParser {
                     const lineaNegocioInput = row.querySelector('.item-lineaNegocio');
                     const centroCostoInput = row.querySelector('.item-centroCosto');
                     const proyectoInput = row.querySelector('.item-proyecto');
-                    const centroCosto = centroCostoInput?.value?.split(' - ')[0] || '';
+                    const centroCosto = centroCostoInput?.value || '';
+
+                     // Asegurar que se obtiene solo el código del proyecto
+                    let proyecto = proyectoInput?.value || '00000000000';
+                    proyecto = extractProyectoCode(proyecto);
 
                     if (importeInput) { // Si existe el input de importe, es una fila de item válida
                         const item = {
@@ -650,7 +664,7 @@ class InvoiceParser {
                             porcentaje: porcentajeInput?.value || '0',
                             lineaNegocio: lineaNegocioInput?.value || '',
                             centroCosto: centroCosto,
-                            proyecto: proyectoInput?.value || ''
+                            proyecto: proyecto
                         };
                         formData.items.push(item);
                     }
@@ -660,16 +674,24 @@ class InvoiceParser {
 
         // Agregar otros cargos si existen
         if (this.otrosCargosList.length > 0) {
+            // Procesar la lista de otros cargos para asegurar que los proyectos estén en el formato correcto
+            const processedOtrosCargos = this.otrosCargosList.map(item => {
+                return {
+                    ...item,
+                    proyecto: extractProyectoCode(item.proyecto)
+                };
+            });
+            
             formData.otrosCargos = {
                 monto: document.getElementById('otrosCargos').value,
-                items: this.otrosCargosList
+                items: processedOtrosCargos
             };
         }
 
         // Extraer solo el código de la cuenta contable
         const cuentaContableValue = document.getElementById('cuentaContableSearch').value;
         formData.cuentaContableSearch = cuentaContableValue.split(' - ')[0];
-    
+
         return formData;
     }
 
@@ -717,25 +739,30 @@ class InvoiceParser {
             this.otrosCargosList = [];
             return;
         }
-
+    
         const itemsActuales = Array.from(document.querySelectorAll('#itemsTableBody tr:not(.total-row):not([id])'));
         
+        // Obtenemos los valores actuales directamente de la interfaz
         this.otrosCargosList = itemsActuales.map(row => {
             const porcentaje = parseFloat(row.querySelector('.item-porcentaje').value) || 0;
             const importeProporcional = (otrosCargos * porcentaje / 100).toFixed(2);
             
-            // Obtener los valores reales de los selectores
-            const lineaNegocioSelect = row.querySelector('.item-lineaNegocio');
-            const centroCostoSearch = row.querySelector('.item-centroCosto-search');
-            const centroCostoHidden = row.querySelector('.item-centroCosto');
+            // Obtener los valores actuales de los selects
+            const lineaNegocioValue = row.querySelector('.item-lineaNegocio').value || '';
+            const centroCostoValue = row.querySelector('.item-centroCosto').value || '';
+            
+            // Importante: Obtener el valor ACTUAL del select de proyecto
             const proyectoSelect = row.querySelector('.item-proyecto');
+            const proyectoValue = proyectoSelect ? proyectoSelect.value : '00000000000';
+            
+            console.log(`Procesando otros cargos: Proyecto seleccionado = ${proyectoValue}`);
             
             return {
                 importe: importeProporcional,
                 porcentaje: porcentaje,
-                lineaNegocio: lineaNegocioSelect?.value || '',
-                centroCosto: centroCostoHidden?.value || '', // Usar el valor del input hidden que tiene solo el código
-                proyecto: proyectoSelect?.value || ''
+                lineaNegocio: lineaNegocioValue,
+                centroCosto: centroCostoValue,
+                proyecto: proyectoValue // Usamos el valor actual del select
             };
         });
         
@@ -750,12 +777,22 @@ class InvoiceParser {
             return {
                 importe: importeProporcional,
                 porcentaje: porcentaje,
-                lineaNegocio: row.querySelector('.item-lineaNegocio').value,
-                centroCosto: row.querySelector('.item-centroCosto')?.value?.split(' - ')[0] || '',
+                lineaNegocio: row.querySelector('.item-lineaNegocio').value || '',
+                centroCosto: row.querySelector('.item-centroCosto')?.value || '',
                 proyecto: row.querySelector('.item-proyecto').value || '00000000000'
             };
         });
     }
+
+    
+}
+
+function extractProyectoCode(proyectoValue) {
+    // Si el proyecto tiene formato "código - descripción", extraer solo el código
+    if (proyectoValue && proyectoValue.includes(' - ')) {
+        return proyectoValue.split(' - ')[0].trim();
+    }
+    return proyectoValue || '00000000000';
 }
 
 // Crear instancia global para acceso desde HTML

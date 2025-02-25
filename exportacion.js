@@ -40,7 +40,6 @@ class ExcelExporter {
             currentRow += 2;
     
             // Obtener valores de los campos select (mantener la descripción completa)
-            const condicionPagoValue = document.getElementById('condicionPago').value;
             const codDetraccionValue = document.getElementById('codigoBien').value;
             const porcentajeDetraccionValue = document.getElementById('porcentajeDetraccion').value;
             const cuentaContableValue = document.getElementById('cuentaContableSearch').value.split(' - ')[0];
@@ -215,7 +214,6 @@ class ExcelExporter {
                 sheet.cell(`O${rowNum}`).value('');
                 sheet.cell(`P${rowNum}`).value('Estándar');
                 sheet.cell(`Q${rowNum}`).value(baseDescription);
-                sheet.cell(`S${rowNum}`).value(formData.basic.condicionPago);
                 
                 // Fechas actuales
                 sheet.cell(`W${rowNum}`).value(formattedToday);
@@ -285,8 +283,7 @@ window.excelExporter = new ExcelExporter();
 
 /*Exportación en JSON*/ 
 
-// Añadir esta clase al final de xml_parser.js
-
+// Actualizar esta sección en exportacion.js para manejar correctamente los nuevos formatos
 class FormStorage {
     constructor() {
         this.initializeFormStorageEvents();
@@ -340,18 +337,12 @@ class FormStorage {
                 }
             });
 
-            // Añadir console.log para debuggear
-            console.log('Cuenta contable original:', document.getElementById('cuentaContableSearch').value);
-            console.log('Cuenta contable después del split:', formData.cuentaContableSearch);
-
             // Obtener el valor directamente desde excelDb
             const cuentaContableFullValue = document.getElementById('cuentaContableSearch').value;
             const cuentaContableCodigo = cuentaContableFullValue.split(' - ')[0].trim();
             
             // Sobrescribir el valor para asegurarnos que solo tenga el código
             formData.cuentaContableSearch = cuentaContableCodigo;
-
-            console.log('Cuenta contable final:', formData.cuentaContableSearch);
 
             // Convertir a JSON y crear blob
             const jsonString = JSON.stringify(formData, null, 2);
@@ -371,8 +362,6 @@ class FormStorage {
             a.click();
             window.URL.revokeObjectURL(url);
             document.body.removeChild(a);
-
-            //alert('Formulario guardado exitosamente');
         } catch (error) {
             console.error('Error saving form:', error);
             alert('Error al guardar el formulario: ' + error.message);
@@ -438,13 +427,12 @@ class FormStorage {
                         if (lineaNegocioSelect && item.lineaNegocio) {
                             lineaNegocioSelect.value = item.lineaNegocio;
                             
-                            // Habilitar y establecer Centro de Costo
+                            // Habilitar y establecer Centro de Costo - MODIFICADO PARA MOSTRAR SOLO EL CÓDIGO
                             const centroCostoSearch = newRow.querySelector('.item-centroCosto-search');
                             const centroCostoHidden = newRow.querySelector('.item-centroCosto');
                             if (centroCostoSearch && centroCostoHidden && item.centroCosto) {
                                 centroCostoSearch.disabled = false;
-                                const descripcionCC = window.excelDb.ccosData.descripcionesCC.get(item.centroCosto) || '';
-                                centroCostoSearch.value = `${item.centroCosto} - ${descripcionCC}`;
+                                centroCostoSearch.value = item.centroCosto; // Solo mostrar el código
                                 centroCostoHidden.value = item.centroCosto;
                                 
                                 // Habilitar y establecer Proyecto
@@ -452,10 +440,13 @@ class FormStorage {
                                 if (proyectoSelect && item.proyecto) {
                                     proyectoSelect.disabled = false;
                                     if (window.excelDb.ccosData.proyectos.has(item.centroCosto)) {
+                                        // Obtener proyectos y sus descripciones
                                         const proyectos = Array.from(window.excelDb.ccosData.proyectos.get(item.centroCosto));
-                                        proyectoSelect.innerHTML = '<option value="">Seleccione proyecto...</option>';
+                                        proyectoSelect.innerHTML = '<option value="00000000000">00000000000</option>';
                                         proyectos.forEach(proyecto => {
-                                            proyectoSelect.add(new Option(proyecto, proyecto));
+                                            const descripcion = window.excelDb.ccosData.descripcionesProyecto.get(proyecto) || '';
+                                            const optionText = descripcion ? `${proyecto} - ${descripcion}` : proyecto;
+                                            proyectoSelect.add(new Option(optionText, proyecto));
                                         });
                                         proyectoSelect.value = item.proyecto;
                                     }
@@ -496,11 +487,9 @@ class FormStorage {
 
             // Actualizar cálculos y referencias
             window.invoiceParser.updateTotalsAndReferences();
-            window.invoiceParser.updateCreditDays();
 
             // Limpiar el input de archivo para permitir cargar el mismo archivo nuevamente
             event.target.value = '';
-            //alert('Formulario cargado exitosamente');
         } catch (error) {
             console.error('Error loading form:', error);
             alert('Error al cargar el formulario: ' + error.message);

@@ -31,9 +31,10 @@ class ExcelDatabase {
             centrosCosto: new Map(),
             proyectos: new Map(),
             descripcionesCC: new Map(),
-            ccosAntiguos: new Map()
+            ccosAntiguos: new Map(),
+            descripcionesProyecto: new Map() // Mapa para guardar descripciones de proyectos
         };
-    
+
         let row = 2;
         while (sheet.cell(`B${row}`).value()) {
             const descripcion = sheet.cell(`B${row}`).value()?.toString() || '';
@@ -41,10 +42,12 @@ class ExcelDatabase {
             const centroCosto = sheet.cell(`D${row}`).value()?.toString() || '';
             const proyecto = sheet.cell(`E${row}`).value()?.toString() || '';
             const ccoAntiguo = sheet.cell(`F${row}`).value()?.toString() || '';
-    
+            
+            const proyectoDesc = descripcion;
+
             if (lineaNegocio) {
                 data.lineasNegocio.add(lineaNegocio);
-    
+
                 if (!data.centrosCosto.has(lineaNegocio)) {
                     data.centrosCosto.set(lineaNegocio, new Set());
                 }
@@ -52,18 +55,44 @@ class ExcelDatabase {
                     data.centrosCosto.get(lineaNegocio).add(centroCosto);
                     data.descripcionesCC.set(centroCosto, descripcion);
                     data.ccosAntiguos.set(centroCosto, ccoAntiguo);
-    
+
                     if (proyecto) {
                         if (!data.proyectos.has(centroCosto)) {
                             data.proyectos.set(centroCosto, new Set());
                         }
                         data.proyectos.get(centroCosto).add(proyecto);
+                        
+                        // Guardar la descripción del proyecto
+                        if (proyectoDesc) {
+                            data.descripcionesProyecto.set(proyecto, proyectoDesc);
+                        }
                     }
                 }
             }
             row++;
         }
-    
+
+        // Buscar en la hoja de Proyectos para complementar las descripciones
+        try {
+            const proyectosSheet = sheet.workbook().sheet('Proyectos');
+            if (proyectosSheet) {
+                console.log("Encontrada hoja de Proyectos, cargando descripciones adicionales");
+                let proyRow = 2;
+                while (proyectosSheet.cell(`A${proyRow}`).value()) {
+                    const codProyecto = proyectosSheet.cell(`A${proyRow}`).value()?.toString() || '';
+                    const descProyecto = proyectosSheet.cell(`B${proyRow}`).value()?.toString() || '';
+                    
+                    if (codProyecto && descProyecto) {
+                        data.descripcionesProyecto.set(codProyecto, descProyecto);
+                        console.log(`Cargada descripción desde hoja Proyectos: ${codProyecto} - ${descProyecto}`);
+                    }
+                    proyRow++;
+                }
+            }
+        } catch (error) {
+            console.log("No se encontró hoja de Proyectos o error al cargar: ", error);
+        }
+
         return data;
     }
 
@@ -155,24 +184,13 @@ class ExcelDatabase {
                     const option = document.createElement('div');
                     option.className = 'select-option';
                     
-                    // Crear estructura para el contenido
-                    const mainContent = document.createElement('span');
-                    mainContent.className = 'cc-main-content';
-                    mainContent.textContent = `${cc} - ${this.ccosData.descripcionesCC.get(cc) || ''}`;
-                    
-                    const antiguoContent = document.createElement('span');
-                    antiguoContent.className = 'cc-antiguo';
-                    const ccoAntiguo = this.ccosData.ccosAntiguos.get(cc);
-                    if (ccoAntiguo) {
-                        antiguoContent.textContent = ` - ${ccoAntiguo}`;
-                    }
-                    
-                    option.appendChild(mainContent);
-                    option.appendChild(antiguoContent);
+                    // CAMBIO: Mostrar solo el código del Centro de Costo
+                    option.textContent = cc;
                     option.dataset.value = cc;
                     
                     option.addEventListener('click', () => {
-                        searchCC.value = `${cc} - ${this.ccosData.descripcionesCC.get(cc) || ''}`;
+                        // CAMBIO: Solo mostrar el código en el campo de búsqueda
+                        searchCC.value = cc;
                         hiddenCC.value = cc;
                         optionsCC.style.display = 'none';
                         this.updateProyectos(selectProyecto, cc);
@@ -186,57 +204,46 @@ class ExcelDatabase {
         };
 
         // Implementar búsqueda de centro de costo
-searchCC.addEventListener('input', () => {
-    const searchTerm = searchCC.value.toLowerCase();
-    const lineaNegocio = selectLN.value;
-    optionsCC.innerHTML = '';
+        searchCC.addEventListener('input', () => {
+            const searchTerm = searchCC.value.toLowerCase();
+            const lineaNegocio = selectLN.value;
+            optionsCC.innerHTML = '';
 
-    if (lineaNegocio && this.ccosData.centrosCosto.has(lineaNegocio)) {
-        const centrosCosto = Array.from(this.ccosData.centrosCosto.get(lineaNegocio));
-        const filteredCC = centrosCosto.filter(cc => {
-            // Asegurarnos de que todos los valores existan y sean strings
-            const ccLower = (cc || '').toString().toLowerCase();
-            const descripcion = (this.ccosData.descripcionesCC.get(cc) || '').toString().toLowerCase();
-            const ccoAntiguo = (this.ccosData.ccosAntiguos.get(cc) || '').toString().toLowerCase();
+            if (lineaNegocio && this.ccosData.centrosCosto.has(lineaNegocio)) {
+                const centrosCosto = Array.from(this.ccosData.centrosCosto.get(lineaNegocio));
+                const filteredCC = centrosCosto.filter(cc => {
+                    // Asegurarnos de que todos los valores existan y sean strings
+                    const ccLower = (cc || '').toString().toLowerCase();
+                    const descripcion = (this.ccosData.descripcionesCC.get(cc) || '').toString().toLowerCase();
+                    const ccoAntiguo = (this.ccosData.ccosAntiguos.get(cc) || '').toString().toLowerCase();
 
-            return ccLower.includes(searchTerm) || 
-                   descripcion.includes(searchTerm) ||
-                   ccoAntiguo.includes(searchTerm);
-        });
+                    return ccLower.includes(searchTerm) || 
+                        descripcion.includes(searchTerm) ||
+                        ccoAntiguo.includes(searchTerm);
+                });
 
-        filteredCC.forEach(cc => {
-            const option = document.createElement('div');
-            option.className = 'select-option';
-            
-            // Crear estructura para el contenido
-            const mainContent = document.createElement('span');
-            mainContent.className = 'cc-main-content';
-            mainContent.textContent = `${cc} - ${this.ccosData.descripcionesCC.get(cc) || ''}`;
-            
-            const antiguoContent = document.createElement('span');
-            antiguoContent.className = 'cc-antiguo';
-            const ccoAntiguo = this.ccosData.ccosAntiguos.get(cc);
-            if (ccoAntiguo) {
-                antiguoContent.textContent = ` - ${ccoAntiguo}`;
+                filteredCC.forEach(cc => {
+                    const option = document.createElement('div');
+                    option.className = 'select-option';
+                    
+                    // CAMBIO: Mostrar solo el código del Centro de Costo
+                    option.textContent = cc;
+                    option.dataset.value = cc;
+                    
+                    option.addEventListener('click', () => {
+                        // CAMBIO: Solo mostrar el código en el campo de búsqueda
+                        searchCC.value = cc;
+                        hiddenCC.value = cc;
+                        optionsCC.style.display = 'none';
+                        this.updateProyectos(selectProyecto, cc);
+                    });
+                    
+                    optionsCC.appendChild(option);
+                });
+                
+                optionsCC.style.display = filteredCC.length ? 'block' : 'none';
             }
-            
-            option.appendChild(mainContent);
-            option.appendChild(antiguoContent);
-            option.dataset.value = cc;
-            
-            option.addEventListener('click', () => {
-                searchCC.value = `${cc} - ${this.ccosData.descripcionesCC.get(cc) || ''}`;
-                hiddenCC.value = cc;
-                optionsCC.style.display = 'none';
-                this.updateProyectos(selectProyecto, cc);
-            });
-            
-            optionsCC.appendChild(option);
         });
-        
-        optionsCC.style.display = filteredCC.length ? 'block' : 'none';
-    }
-});
 
         // Reemplazar contenido de las celdas
         tdLineaNegocio.innerHTML = '';
@@ -252,19 +259,24 @@ searchCC.addEventListener('input', () => {
         tdProyecto.appendChild(selectProyecto);
     }
 
-    updateProyectos(selectProyecto, centroCosto) {
-        // Inicializar con la opción de 11 ceros y hacerlo required
-        selectProyecto.innerHTML = '<option value="00000000000">00000000000</option>';
-        selectProyecto.disabled = !centroCosto;
-        selectProyecto.required = true; // Hacer el campo obligatorio
-    
-        if (centroCosto && this.ccosData.proyectos.has(centroCosto)) {
-            const proyectos = Array.from(this.ccosData.proyectos.get(centroCosto));
-            proyectos.forEach(proyecto => {
-                selectProyecto.add(new Option(proyecto, proyecto));
-            });
-        }
+    // Reemplazar en excel_db.js
+updateProyectos(selectProyecto, centroCosto) {
+    // Inicializar con la opción de 11 ceros y hacerlo required
+    selectProyecto.innerHTML = '<option value="00000000000">00000000000 - Sin Proyecto</option>';
+    selectProyecto.disabled = !centroCosto;
+    selectProyecto.required = true; // Hacer el campo obligatorio
+
+    if (centroCosto && this.ccosData.proyectos.has(centroCosto)) {
+        const proyectos = Array.from(this.ccosData.proyectos.get(centroCosto));
+        proyectos.forEach(proyecto => {
+            // Obtener descripción del proyecto
+            const descripcion = this.ccosData.descripcionesProyecto.get(proyecto) || '';
+            const optionText = descripcion ? `${proyecto} - ${descripcion}` : proyecto;
+            
+            selectProyecto.add(new Option(optionText, proyecto));
+        });
     }
+}
 
     loadSheetData(sheet, col1, col2) {
         try {
@@ -312,155 +324,151 @@ searchCC.addEventListener('input', () => {
         });
     }
 
-    // En excel_db.js, modificar el método initializeSearchableSelect:
-
-// Modificar en excel_db.js - corregir el método initializeSearchableSelect
-
-initializeSearchableSelect(elementId, data) {
-    const searchInput = document.getElementById(`${elementId}Search`);
-    const hiddenInput = document.getElementById(elementId);
-    const optionsContainer = document.getElementById(`${elementId}Options`);
-    
-    if (!searchInput || !optionsContainer || !hiddenInput) return;
-
-    let searchTimeout = null;
-
-    const showFilteredOptions = (searchTerm = '') => {
-        // Asegurarnos de que tenemos acceso a los datos
-        if (!this.data.cuentasContables || !Array.isArray(this.data.cuentasContables)) {
-            console.error('No hay datos de cuentas contables disponibles');
-            return;
-        }
-
-        // Filtrar los datos
-        const filteredData = searchTerm.length > 0 
-            ? this.data.cuentasContables.filter(item => {
-                const searchLower = searchTerm.toLowerCase();
-                return (
-                    (item.label && item.label.toLowerCase().includes(searchLower)) ||
-                    (item.value && item.value.toLowerCase().includes(searchLower))
-                );
-            })
-            : this.data.cuentasContables;
-
-        // Limpiar y llenar el contenedor de opciones
-        optionsContainer.innerHTML = '';
+    initializeSearchableSelect(elementId, data) {
+        const searchInput = document.getElementById(`${elementId}Search`);
+        const hiddenInput = document.getElementById(elementId);
+        const optionsContainer = document.getElementById(`${elementId}Options`);
         
-        if (filteredData.length === 0) {
-            const noResults = document.createElement('div');
-            noResults.className = 'select-option';
-            noResults.textContent = 'No se encontraron resultados';
-            optionsContainer.appendChild(noResults);
-        } else {
-            filteredData.forEach(item => {
-                const option = document.createElement('div');
-                option.className = 'select-option';
-                option.dataset.value = item.value;
-                option.textContent = item.label;
-                
-                option.addEventListener('click', () => {
-                    const codigo = item.value; // Este es el código sin descripción
-                    const descripcion = item.label; // Este es el valor completo
-                    console.log('Código seleccionado:', codigo);
-                    console.log('Descripción completa:', descripcion);
+        if (!searchInput || !optionsContainer || !hiddenInput) return;
+
+        let searchTimeout = null;
+
+        const showFilteredOptions = (searchTerm = '') => {
+            // Asegurarnos de que tenemos acceso a los datos
+            if (!this.data.cuentasContables || !Array.isArray(this.data.cuentasContables)) {
+                console.error('No hay datos de cuentas contables disponibles');
+                return;
+            }
+
+            // Filtrar los datos
+            const filteredData = searchTerm.length > 0 
+                ? this.data.cuentasContables.filter(item => {
+                    const searchLower = searchTerm.toLowerCase();
+                    return (
+                        (item.label && item.label.toLowerCase().includes(searchLower)) ||
+                        (item.value && item.value.toLowerCase().includes(searchLower))
+                    );
+                })
+                : this.data.cuentasContables;
+
+            // Limpiar y llenar el contenedor de opciones
+            optionsContainer.innerHTML = '';
+            
+            if (filteredData.length === 0) {
+                const noResults = document.createElement('div');
+                noResults.className = 'select-option';
+                noResults.textContent = 'No se encontraron resultados';
+                optionsContainer.appendChild(noResults);
+            } else {
+                filteredData.forEach(item => {
+                    const option = document.createElement('div');
+                    option.className = 'select-option';
+                    option.dataset.value = item.value;
+                    option.textContent = item.label;
                     
-                    searchInput.value = descripcion;
-                    hiddenInput.value = codigo; // Guardamos solo el código en el input hidden
-                    optionsContainer.classList.remove('active');
+                    option.addEventListener('click', () => {
+                        const codigo = item.value; // Este es el código sin descripción
+                        const descripcion = item.label; // Este es el valor completo
+                        console.log('Código seleccionado:', codigo);
+                        console.log('Descripción completa:', descripcion);
+                        
+                        searchInput.value = descripcion;
+                        hiddenInput.value = codigo; // Guardamos solo el código en el input hidden
+                        optionsContainer.classList.remove('active');
+                    });
+                    
+                    optionsContainer.appendChild(option);
                 });
-                
-                optionsContainer.appendChild(option);
-            });
-        }
+            }
 
-        optionsContainer.classList.add('active');
-    };
+            optionsContainer.classList.add('active');
+        };
 
-    // Mejorar el evento de input para la búsqueda
-    searchInput.addEventListener('input', (e) => {
-        if (searchTimeout) {
-            clearTimeout(searchTimeout);
-        }
-        
-        searchTimeout = setTimeout(() => {
-            const searchTerm = e.target.value;
-            showFilteredOptions(searchTerm);
-        }, 300);
-    });
+        // Mejorar el evento de input para la búsqueda
+        searchInput.addEventListener('input', (e) => {
+            if (searchTimeout) {
+                clearTimeout(searchTimeout);
+            }
+            
+            searchTimeout = setTimeout(() => {
+                const searchTerm = e.target.value;
+                showFilteredOptions(searchTerm);
+            }, 300);
+        });
 
-    // Mostrar todas las opciones al hacer focus
-    searchInput.addEventListener('focus', () => {
-        showFilteredOptions(searchInput.value);
-    });
+        // Mostrar todas las opciones al hacer focus
+        searchInput.addEventListener('focus', () => {
+            showFilteredOptions(searchInput.value);
+        });
 
-    // Cerrar las opciones al hacer click fuera
-    document.addEventListener('click', (e) => {
-        if (!searchInput.contains(e.target) && !optionsContainer.contains(e.target)) {
-            optionsContainer.classList.remove('active');
-        }
-    });
-
-    // Mejorar la navegación con teclado
-    searchInput.addEventListener('keydown', (e) => {
-        const options = Array.from(optionsContainer.querySelectorAll('.select-option'));
-        const selectedOption = optionsContainer.querySelector('.select-option.selected');
-        let selectedIndex = options.indexOf(selectedOption);
-
-        switch (e.key) {
-            case 'ArrowDown':
-                e.preventDefault();
-                if (selectedIndex < options.length - 1) {
-                    if (selectedOption) selectedOption.classList.remove('selected');
-                    options[selectedIndex + 1].classList.add('selected');
-                    options[selectedIndex + 1].scrollIntoView({ block: 'nearest' });
-                } else if (selectedIndex === -1 && options.length > 0) {
-                    options[0].classList.add('selected');
-                    options[0].scrollIntoView({ block: 'nearest' });
-                }
-                break;
-
-            case 'ArrowUp':
-                e.preventDefault();
-                if (selectedIndex > 0) {
-                    if (selectedOption) selectedOption.classList.remove('selected');
-                    options[selectedIndex - 1].classList.add('selected');
-                    options[selectedIndex - 1].scrollIntoView({ block: 'nearest' });
-                }
-                break;
-
-            case 'Enter':
-                e.preventDefault();
-                if (selectedOption) {
-                    const value = selectedOption.dataset.value;
-                    const label = selectedOption.textContent;
-                    searchInput.value = label;
-                    hiddenInput.value = value;
-                    optionsContainer.classList.remove('active');
-                }
-                break;
-
-            case 'Escape':
-                e.preventDefault();
+        // Cerrar las opciones al hacer click fuera
+        document.addEventListener('click', (e) => {
+            if (!searchInput.contains(e.target) && !optionsContainer.contains(e.target)) {
                 optionsContainer.classList.remove('active');
-                searchInput.blur();
-                break;
-        }
-    });
+            }
+        });
 
-    // Agregar funcionalidad para limpiar la selección
-    const clearSelection = () => {
-        searchInput.value = '';
-        hiddenInput.value = '';
-        optionsContainer.classList.remove('active');
-    };
+        // Mejorar la navegación con teclado
+        searchInput.addEventListener('keydown', (e) => {
+            const options = Array.from(optionsContainer.querySelectorAll('.select-option'));
+            const selectedOption = optionsContainer.querySelector('.select-option.selected');
+            let selectedIndex = options.indexOf(selectedOption);
 
-    // Permitir borrar la selección
-    searchInput.addEventListener('keyup', (e) => {
-        if (e.key === 'Backspace' && searchInput.value === '') {
-            clearSelection();
-        }
-    });
-}
+            switch (e.key) {
+                case 'ArrowDown':
+                    e.preventDefault();
+                    if (selectedIndex < options.length - 1) {
+                        if (selectedOption) selectedOption.classList.remove('selected');
+                        options[selectedIndex + 1].classList.add('selected');
+                        options[selectedIndex + 1].scrollIntoView({ block: 'nearest' });
+                    } else if (selectedIndex === -1 && options.length > 0) {
+                        options[0].classList.add('selected');
+                        options[0].scrollIntoView({ block: 'nearest' });
+                    }
+                    break;
+
+                case 'ArrowUp':
+                    e.preventDefault();
+                    if (selectedIndex > 0) {
+                        if (selectedOption) selectedOption.classList.remove('selected');
+                        options[selectedIndex - 1].classList.add('selected');
+                        options[selectedIndex - 1].scrollIntoView({ block: 'nearest' });
+                    }
+                    break;
+
+                case 'Enter':
+                    e.preventDefault();
+                    if (selectedOption) {
+                        const value = selectedOption.dataset.value;
+                        const label = selectedOption.textContent;
+                        searchInput.value = label;
+                        hiddenInput.value = value;
+                        optionsContainer.classList.remove('active');
+                    }
+                    break;
+
+                case 'Escape':
+                    e.preventDefault();
+                    optionsContainer.classList.remove('active');
+                    searchInput.blur();
+                    break;
+            }
+        });
+
+        // Agregar funcionalidad para limpiar la selección
+        const clearSelection = () => {
+            searchInput.value = '';
+            hiddenInput.value = '';
+            optionsContainer.classList.remove('active');
+        };
+
+        // Permitir borrar la selección
+        searchInput.addEventListener('keyup', (e) => {
+            if (e.key === 'Backspace' && searchInput.value === '') {
+                clearSelection();
+            }
+        });
+    }
 
     addOptionsToSelect(select, data) {
         // Mantener las dos primeras opciones (Seleccione... y buscador)
