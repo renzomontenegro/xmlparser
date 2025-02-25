@@ -97,7 +97,8 @@ class ExcelDatabase {
         const selectProyecto = document.createElement('select');
         selectProyecto.className = 'item-proyecto';
         selectProyecto.disabled = true;
-        selectProyecto.innerHTML = '<option value="">Seleccione proyecto...</option>';
+        selectProyecto.required = true; // Hacerlo obligatorio
+        selectProyecto.innerHTML = '<option value="00000000000">00000000000</option>';
 
         // Eventos
         selectLN.addEventListener('change', () => {
@@ -252,9 +253,11 @@ searchCC.addEventListener('input', () => {
     }
 
     updateProyectos(selectProyecto, centroCosto) {
-        selectProyecto.innerHTML = '<option value="">Seleccione proyecto...</option>';
+        // Inicializar con la opción de 11 ceros y hacerlo required
+        selectProyecto.innerHTML = '<option value="00000000000">00000000000</option>';
         selectProyecto.disabled = !centroCosto;
-
+        selectProyecto.required = true; // Hacer el campo obligatorio
+    
         if (centroCosto && this.ccosData.proyectos.has(centroCosto)) {
             const proyectos = Array.from(this.ccosData.proyectos.get(centroCosto));
             proyectos.forEach(proyecto => {

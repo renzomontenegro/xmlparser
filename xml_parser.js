@@ -752,7 +752,7 @@ class InvoiceParser {
                 porcentaje: porcentaje,
                 lineaNegocio: row.querySelector('.item-lineaNegocio').value,
                 centroCosto: row.querySelector('.item-centroCosto')?.value?.split(' - ')[0] || '',
-                proyecto: row.querySelector('.item-proyecto').value
+                proyecto: row.querySelector('.item-proyecto').value || '00000000000'
             };
         });
     }
