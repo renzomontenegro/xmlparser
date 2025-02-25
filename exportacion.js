@@ -54,8 +54,6 @@ class ExcelExporter {
                 { label: 'Fecha Emisión:', value: formData.basic.fechaEmision },
                 { label: 'N° Comprobante:', value: formData.basic.numeroComprobante },
                 { label: 'Importe Total (Con IGV):', value: formData.basic.importe },
-                { label: 'Condición de Pago:', value: condicionPagoValue },
-                { label: 'Fecha Vencimiento:', value: formData.basic.fechaVencimiento },
                 { label: 'Cuenta Contable:', value: cuentaContableValue },
                 { label: 'Tipo de Factura:', value: tipoFacturaValue }
             ];

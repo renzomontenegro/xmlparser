@@ -12,7 +12,6 @@ class ExcelDatabase {
             const arrayBuffer = await response.arrayBuffer();
             const workbook = await XlsxPopulate.fromDataAsync(arrayBuffer);
             
-            this.data.condicionPago = this.loadSheetData(workbook.sheet('Condicion Pago'), 'Código', 'Días');
             this.data.porDetraccion = this.loadSheetData(workbook.sheet('PorDetracción'), 'Impuesto', 'Nombre de Impuesto');
             this.data.codDetraccion = this.loadSheetData(workbook.sheet('CodDetracción'), 'Código', 'Detalle');
             this.data.cuentasContables = this.loadSheetData(workbook.sheet('CContables'), 'Cuenta', 'Descripción');
@@ -290,7 +289,6 @@ searchCC.addEventListener('input', () => {
     }
 
     initializeSelectors() {
-        this.populateSelect('condicionPago', this.data.condicionPago);
         this.populateSelect('porcentajeDetraccion', this.data.porDetraccion);
         this.populateSelect('codigoBien', this.data.codDetraccion);
         this.initializeSearchableSelect('cuentaContable', this.data.cuentasContables);
@@ -309,10 +307,6 @@ searchCC.addEventListener('input', () => {
             option.textContent = item.label;
             select.appendChild(option);
         });
-
-        if (elementId === 'condicionPago') {
-            select.addEventListener('change', () => this.handleCondicionPagoChange(select.value));
-        }
     }
 
     // En excel_db.js, modificar el método initializeSearchableSelect:
@@ -478,22 +472,6 @@ initializeSearchableSelect(elementId, data) {
             option.textContent = item.label;
             select.appendChild(option);
         });
-    }
-
-    handleCondicionPagoChange(value) {
-        const condicionPago = this.data.condicionPago.find(item => item.value === value);
-        if (condicionPago) {
-            const dias = parseInt(condicionPago.label.split('-')[1].trim());
-            if (!isNaN(dias)) {
-                const fechaEmision = document.getElementById('fechaEmision').value;
-                if (fechaEmision) {
-                    const fechaVencimiento = new Date(fechaEmision);
-                    fechaVencimiento.setDate(fechaVencimiento.getDate() + dias);
-                    document.getElementById('fechaVencimiento').value = 
-                        fechaVencimiento.toISOString().split('T')[0];
-                }
-            }
-        }
     }
 }
 

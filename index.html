@@ -56,11 +56,6 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="fechaVencimiento">Fecha Vencimiento</label>
-                    <input type="date" id="fechaVencimiento" name="fechaVencimiento" required>
-                </div>
-
-                <div class="form-group">
                     <label for="numeroComprobanteParte1">N° Comprobante de Pago</label>
                     <div class="comprobante-container">
                         <input type="text" id="numeroComprobanteParte1" maxlength="4" pattern="^[A-Za-z0-9]{4}$" required
@@ -80,13 +75,6 @@
                     <label for="importe">Importe Total</label>
                     <input type="number" step="0.01" id="importe" name="importe" required>
                     <small class="form-text text-muted">(Importe con IGV)</small>
-                </div>
-
-                <div class="form-group">
-                    <label for="condicionPago">Condición de Pago</label>
-                    <select id="condicionPago" name="condicionPago" required>
-                        <option value="">Seleccione...</option>
-                    </select>
                 </div>
 
                 <div class="form-group">
@@ -154,7 +142,7 @@
                 <div class="accordion-content">
                     <div class="optional-fields-grid">
                         <div class="form-group">
-                            <label for="cantidadItems">¿Cuántos items necesitas?</label>
+                            <label for="cantidadItems">¿Cuántos Centros de Costo necesitas?</label>
                             <input type="number" id="cantidadItems" min="1" placeholder="Ingrese la cantidad de items">
                         </div>
                         <div class="form-group">

@@ -16,8 +16,6 @@ class InvoiceParser {
         document.getElementById('xmlFile').addEventListener('change', (e) => this.handleFileUpload(e));
         document.getElementById('invoiceForm').addEventListener('submit', (e) => this.handleFormSubmit(e));
         document.getElementById('addItemBtn').addEventListener('click', () => this.addNewItem());
-        document.getElementById('fechaEmision').addEventListener('change', () => this.updateCreditDays());
-        document.getElementById('fechaVencimiento').addEventListener('change', () => this.updateCreditDays());
         document.getElementById('clearFormBtn').addEventListener('click', () => this.clearForm());
 
         // Nueva función de validación
@@ -178,9 +176,6 @@ class InvoiceParser {
             
             // Limpiar la tabla de items
             this.clearItems();
-            
-            // Restablecer los campos calculados
-            document.getElementById('condicionPago').value = '';
             
             // Agregar una fila vacía en la tabla de items
             this.addNewItem();
@@ -381,12 +376,10 @@ class InvoiceParser {
     populateForm(data) {
         // Crear una lista de campos que NO deben ser autocompletados
         const excludeFields = [
-            'condicionPago',
             'porcentajeDetraccion',
             'codigoBien',
             'cuentaContable',
             'tipoFactura',
-            'fechaVencimiento'
         ];
 
         // Poblar solo los campos que no están en la lista de exclusión
@@ -412,9 +405,6 @@ class InvoiceParser {
         // Limpiar items existentes y agregar nueva fila
         this.clearItems();
         this.addNewItem();
-
-        // Actualizar días de crédito
-        this.updateCreditDays();
 
         // Manejar el número de comprobante
         if (data.numeroComprobante) {
@@ -612,37 +602,6 @@ class InvoiceParser {
         tbody.appendChild(totalRow);
     }
 
-    updateCreditDays() {
-        const condicionPagoInput = document.getElementById('condicionPago');
-        const fechaEmisionInput = document.getElementById('fechaEmision');
-        
-        // Agregar evento al input de condición de pago
-        condicionPagoInput.addEventListener('change', () => {
-            this.calculateDueDate();
-        });
-    
-        // Agregar evento a la fecha de emisión
-        fechaEmisionInput.addEventListener('change', () => {
-            this.calculateDueDate();
-        });
-    }
-
-    calculateDueDate() {
-        const fechaEmision = document.getElementById('fechaEmision').value;
-        const diasCredito = parseInt(document.getElementById('condicionPago').value) || 0;
-        
-        if (fechaEmision && !isNaN(diasCredito)) {
-            const fechaBase = new Date(fechaEmision);
-            const fechaVencimiento = new Date(fechaBase.setDate(fechaBase.getDate() + diasCredito));
-            
-            // Formatear la fecha para el input date (YYYY-MM-DD)
-            const fechaFormateada = fechaVencimiento.toISOString().split('T')[0];
-            document.getElementById('fechaVencimiento').value = fechaFormateada;
-        } else {
-            document.getElementById('fechaVencimiento').value = '';
-        }
-    }
-
     collectFormData() {
         const formData = {
             basic: {},
@@ -652,7 +611,7 @@ class InvoiceParser {
         // Lista de campos básicos a recolectar
         const basicFields = [
             'ruc', 'razonSocial', 'moneda', 'fechaEmision', 'numeroComprobante',
-            'importe', 'condicionPago', 'fechaVencimiento', 'solicitante',
+            'importe', 'solicitante',
             'descripcion', 'codigoBien', 'porcentajeDetraccion', 'fechaInicioLicencia',
             'fechaFinLicencia', 'areaSolicitante'
         ];
