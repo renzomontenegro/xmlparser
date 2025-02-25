@@ -550,4 +550,36 @@ tr:not(.reference-row):not(.total-row):hover {
     gap: 20px;
 }
 
-/* ... rest of the code ... */
+/*Pautas - Condiciones Generales*/
+
+/* Agregar estos estilos al archivo style.css */
+.conditions-section {
+    margin-top: 30px;
+    padding: 20px;
+    background-color: #f9f9f9;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.conditions-section h3 {
+    margin-bottom: 15px;
+    color: #333;
+    font-size: 18px;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 10px;
+}
+
+.conditions-section ul {
+    padding-left: 20px;
+}
+
+.conditions-section li {
+    margin-bottom: 8px;
+    line-height: 1.5;
+    color: #555;
+}
+
+.conditions-section li::marker {
+    color: #4A90E2;
+}

@@ -755,7 +755,6 @@ class InvoiceParser {
             const proyectoSelect = row.querySelector('.item-proyecto');
             const proyectoValue = proyectoSelect ? proyectoSelect.value : '00000000000';
             
-            console.log(`Procesando otros cargos: Proyecto seleccionado = ${proyectoValue}`);
             
             return {
                 importe: importeProporcional,
