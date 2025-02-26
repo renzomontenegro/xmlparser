@@ -20,8 +20,8 @@
             </div>
             
             <div class="upload-section secondary">
-                <h2>Sube aquí un JSON</h2>
-                <p>Carga un formulario previamente hecho, en formato JSON</p>
+                <h2>Sube aquí tu Backup</h2>
+                <p>Carga un formulario previamente hecho, el archivo con extensión '.json'</p>
                 <input type="file" id="jsonFile" accept=".json">
             </div>
         </div>
@@ -74,13 +74,13 @@
                     </small>
                 </div>
 
-                <!-- Sección 3: Importes y condiciones -->
+                <!-- Sección 3: Importes y condiciones 
                 <div class="form-group">
                     <label for="importe">Importe Total</label>
                     <input type="number" step="0.01" id="importe" name="importe" required>
                     <small class="form-text text-muted">(Importe con IGV)</small>
                 </div>
-
+                -->
                 <div class="form-group">
                     <label for="porcentajeDetraccion">Porcentaje detracción</label>
                     <select id="porcentajeDetraccion" name="porcentajeDetraccion">
@@ -141,19 +141,40 @@
             </div>
 
             <!-- Campos opcionales en acordeón -->
-            <div class="optional-fields-accordion">
-                <button type="button" class="accordion-toggle">Opciones adicionales ▼</button>
-                <div class="accordion-content">
-                    <div class="optional-fields-grid">
-                        <div class="form-group">
-                            <label for="cantidadItems">¿Cuántos Centros de Costo necesitas?</label>
-                            <input type="number" id="cantidadItems" min="1" placeholder="Ingrese la cantidad de items">
-                        </div>
-                        <div class="form-group">
-                            <label for="otrosCargos">¿Esta factura tiene otros cargos?</label>
-                            <input type="number" id="otrosCargos" min="0" step="0.01" placeholder="Ingrese el monto de otros cargos">
+            <div class="desglose-factura-section">
+                <h3>Desglose Factura</h3>
+                <div class="desglose-table">
+                    <div class="desglose-row">
+                        <div class="desglose-label">Base Imponible (Importe Total Sin IGV y Sin Otros Cargos):</div>
+                        <div class="desglose-input"><input type="number" id="baseImponible" step="0.01" min="0"></div>
+                    </div>
+                    <div class="desglose-row">
+                        <div class="desglose-label">IGV (18%):</div>
+                        <div class="desglose-input"><input type="number" id="igv" step="0.01" min="0"></div>
+                    </div>
+                    <div class="desglose-row">
+                        <div class="desglose-label">Otros Cargos (Sumatoria Cargos):</div>
+                        <div class="desglose-input">
+                            <input type="number" id="otrosCargos" step="0.01" min="0">
+                            <button type="button" id="recalcularBtn">Recalcular</button>
                         </div>
                     </div>
+                    <div class="desglose-row">
+                        <div class="desglose-label">Total (Suma):</div>
+                        <div class="desglose-input"><span id="totalSuma">0.00</span></div>
+                    </div>
+                    <div class="desglose-row">
+                        <div class="desglose-label">Total Factura:</div>
+                        <div class="desglose-input"><input type="number" id="importe" name="importe" step="0.01" min="0" required></div>
+                    </div>
+                </div>
+                <div id="validacionTotal" class="validacion-mensaje"></div>
+            </div>
+
+            <div class="optional-fields-section">
+                <div class="form-group">
+                    <label for="cantidadItems">¿Cuántos Centros de Costo necesitas?</label>
+                    <input type="number" id="cantidadItems" min="1" placeholder="Ingrese la cantidad de items">
                 </div>
             </div>
 

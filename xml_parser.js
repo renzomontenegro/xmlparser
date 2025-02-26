@@ -8,8 +8,9 @@ class InvoiceParser {
         this.initializeEventListeners();
         this.initializeComprobanteFormat();
         this.initializeRucValidation();
-        this.otrosCargosList = []; // Añadir esta propiedad
+        this.otrosCargosList = []; 
         this.initializeNewFields();
+        this.initializeDesgloseFactura();
     }
 
     initializeEventListeners() {
@@ -174,14 +175,19 @@ class InvoiceParser {
             // Limpiar todos los inputs del formulario
             document.getElementById('invoiceForm').reset();
             
+            // Limpiar los nuevos campos de desglose
+            document.getElementById('baseImponible').value = '';
+            document.getElementById('igv').value = '';
+            document.getElementById('otrosCargos').value = '';
+            document.getElementById('totalSuma').textContent = '0.00';
+            document.getElementById('validacionTotal').textContent = '';
+            document.getElementById('validacionTotal').className = 'validacion-mensaje';
+            
             // Limpiar la tabla de items
             this.clearItems();
             
             // Agregar una fila vacía en la tabla de items
             this.addNewItem();
-    
-            // Opcional: Mostrar mensaje de éxito
-            alert('El formulario ha sido limpiado exitosamente.');
         }
     }
 
@@ -440,8 +446,9 @@ class InvoiceParser {
 
     addNewItem(itemData = null) {
         const tbody = document.getElementById('itemsTableBody');
-        const importeTotal = parseFloat(document.getElementById('importe').value) || 0;
-        const importeSinIGV = importeTotal / 1.18;
+        
+        // Usar la base imponible en vez del importe total para los cálculos
+        const baseImponible = parseFloat(document.getElementById('baseImponible').value) || 0;
         
         // Obtener índice correcto contando solo las filas de items
         const itemRows = tbody.querySelectorAll('tr:not(#totalRow):not(#importeSinIGVRow):not(#importeConIGVRow)');
@@ -472,16 +479,29 @@ class InvoiceParser {
         const importeInput = newRow.querySelector('.item-importe');
         const porcentajeInput = newRow.querySelector('.item-porcentaje');
     
+        // Establecer valores iniciales si no se proporcionaron datos
+        if (!itemData) {
+            // Si no hay datos proporcionados y hay base imponible, establecer valores predeterminados
+            if (baseImponible > 0) {
+                // Si es el primer item, establecer 100%, de lo contrario 0%
+                const defaultPorcentaje = itemRows.length === 0 ? 100 : 0;
+                porcentajeInput.value = defaultPorcentaje;
+                importeInput.value = ((baseImponible * defaultPorcentaje) / 100).toFixed(2);
+            }
+        }
+    
         porcentajeInput.addEventListener('input', () => {
             const porcentaje = parseFloat(porcentajeInput.value) || 0;
-            const nuevoImporte = (importeSinIGV * porcentaje / 100);
+            // Usar base imponible en lugar de importeSinIGV
+            const nuevoImporte = (baseImponible * porcentaje / 100);
             importeInput.value = nuevoImporte.toFixed(2);
             this.updateTotalsAndReferences();
         });
     
         importeInput.addEventListener('input', () => {
             const importe = parseFloat(importeInput.value) || 0;
-            const nuevoPorcentaje = (importe / importeSinIGV * 100);
+            // Usar base imponible en lugar de importeSinIGV para el cálculo del porcentaje
+            const nuevoPorcentaje = baseImponible > 0 ? (importe / baseImponible * 100) : 0;
             porcentajeInput.value = nuevoPorcentaje.toFixed(2);
             this.updateTotalsAndReferences();
         });
@@ -502,7 +522,11 @@ class InvoiceParser {
     updateTotalsAndReferences() {
         const tbody = document.getElementById('itemsTableBody');
         const importeTotal = parseFloat(document.getElementById('importe').value) || 0;
-        const importeSinIGV = importeTotal / 1.18;
+        
+        // Usar valores del desglose si están disponibles
+        const baseImponibleInput = document.getElementById('baseImponible');
+        const baseImponible = parseFloat(baseImponibleInput.value) || 0;
+        const importeSinIGV = baseImponible > 0 ? baseImponible : (importeTotal / 1.18);
     
         // Remover filas de totales existentes si hay
         ['totalRow', 'importeSinIGVRow', 'importeConIGVRow'].forEach(id => {
@@ -656,6 +680,9 @@ class InvoiceParser {
         });
         
         formData.basic.numeroComprobante = document.getElementById('numeroComprobante').value;
+        // Añadir campos de desglose
+        formData.baseImponible = document.getElementById('baseImponible').value || '';
+        formData.igv = document.getElementById('igv').value || '';
 
         // Recolectar solo las filas de items (excluyendo las filas de totales y referencias)
         const tbody = document.getElementById('itemsTableBody');
@@ -713,18 +740,105 @@ class InvoiceParser {
         return formData;
     }
 
+    initializeDesgloseFactura() {
+        const baseImponibleInput = document.getElementById('baseImponible');
+        const igvInput = document.getElementById('igv');
+        const otrosCargosInput = document.getElementById('otrosCargos');
+        const totalSumaSpan = document.getElementById('totalSuma');
+        const importeInput = document.getElementById('importe');
+        const validacionTotal = document.getElementById('validacionTotal');
+        const recalcularBtn = document.getElementById('recalcularBtn');
+    
+        // Función para calcular totales
+        const calcularTotales = () => {
+            const baseImponible = parseFloat(baseImponibleInput.value) || 0;
+            const igv = parseFloat(igvInput.value) || 0;
+            const otrosCargos = parseFloat(otrosCargosInput.value) || 0;
+            
+            // Calcular suma total
+            const suma = baseImponible + igv + otrosCargos;
+            totalSumaSpan.textContent = suma.toFixed(2);
+            
+            // Validar si coincide con el total factura
+            const totalFactura = parseFloat(importeInput.value) || 0;
+            
+            if (Math.abs(suma - totalFactura) < 0.01) { // Tolerancia para problemas de redondeo
+                validacionTotal.textContent = "✓ Los totales coinciden correctamente";
+                validacionTotal.className = "validacion-mensaje validacion-success";
+            } else {
+                validacionTotal.textContent = "⚠ Los totales no coinciden. Debe ajustar los valores.";
+                validacionTotal.className = "validacion-mensaje validacion-error";
+            }
+            
+            // Actualizar la tabla de referencia
+            this.updateTotalsAndReferences();
+        };
+        
+        
+        // Calcular IGV automáticamente cuando cambia la base imponible
+        baseImponibleInput.addEventListener('input', () => {
+            const baseImponible = parseFloat(baseImponibleInput.value) || 0;
+            igvInput.value = (baseImponible * 0.18).toFixed(2);
+            calcularTotales();
+            
+            // Actualizar los importes de los items según sus porcentajes
+            this.updateItemImportes(baseImponible);
+        });
+        
+        // Recalcular suma cuando cambia cualquier valor
+        igvInput.addEventListener('input', calcularTotales);
+        otrosCargosInput.addEventListener('input', calcularTotales);
+        importeInput.addEventListener('input', calcularTotales);
+        
+        // Botón recalcular - ajusta la base imponible para que la suma coincida con el total factura
+        recalcularBtn.addEventListener('click', () => {
+            const totalFactura = parseFloat(importeInput.value) || 0;
+            const otrosCargos = parseFloat(otrosCargosInput.value) || 0;
+            
+            // Si no hay total factura, no podemos calcular
+            if (totalFactura <= 0) {
+                alert('Debe ingresar un Total Factura válido para recalcular');
+                return;
+            }
+            
+            // Calcular la base imponible necesaria para que cuadre
+            // Base = (Total - OtrosCargos) / 1.18
+            const baseCalculada = (totalFactura - otrosCargos) / 1.18;
+            
+            if (baseCalculada < 0) {
+                alert('El valor de Otros Cargos es mayor que el Total Factura. Por favor, ajuste los valores.');
+                return;
+            }
+            
+            baseImponibleInput.value = baseCalculada.toFixed(2);
+            igvInput.value = (baseCalculada * 0.18).toFixed(2);
+            calcularTotales();
+        });
+    }
+
+    updateItemImportes(baseImponible) {
+        const tbody = document.getElementById('itemsTableBody');
+        const items = tbody.querySelectorAll('tr:not(.total-row):not(#totalRow):not(#importeSinIGVRow):not(#importeConIGVRow)');
+        
+        items.forEach(row => {
+            const importeInput = row.querySelector('.item-importe');
+            const porcentajeInput = row.querySelector('.item-porcentaje');
+            
+            if (importeInput && porcentajeInput) {
+                const porcentaje = parseFloat(porcentajeInput.value) || 0;
+                // Calcula el nuevo importe basado en el porcentaje y la nueva base imponible
+                const nuevoImporte = baseImponible * (porcentaje / 100);
+                importeInput.value = nuevoImporte.toFixed(2);
+            }
+        });
+        
+        // Actualizar los totales y referencias después de modificar los items
+        this.updateTotalsAndReferences();
+    }
+
     initializeNewFields() {
         const cantidadItemsInput = document.getElementById('cantidadItems');
         const otrosCargosInput = document.getElementById('otrosCargos');
-        const accordionToggle = document.querySelector('.accordion-toggle');
-
-        // Manejar el acordeón
-        accordionToggle.addEventListener('click', () => {
-            const content = document.querySelector('.accordion-content');
-            content.classList.toggle('active');
-            accordionToggle.textContent = content.classList.contains('active') ? 
-                'Opciones adicionales ▼' : 'Opciones adicionales ▶';
-        });
 
         cantidadItemsInput.addEventListener('input', () => this.handleCantidadItemsChange());
         otrosCargosInput.addEventListener('input', () => this.handleOtrosCargosChange());
@@ -733,20 +847,21 @@ class InvoiceParser {
     handleCantidadItemsChange() {
         const cantidadItems = parseInt(document.getElementById('cantidadItems').value);
         if (!cantidadItems || isNaN(cantidadItems)) return;
-
+    
         this.clearItems(); // Limpiar items existentes
-        const importeTotal = parseFloat(document.getElementById('importe').value) || 0;
-        const importeSinIGV = importeTotal / 1.18;
+        
+        // Obtener la base imponible actual directamente
+        const baseImponible = parseFloat(document.getElementById('baseImponible').value) || 0;
         const porcentajePorItem = 100 / cantidadItems;
-        const importePorItem = (importeSinIGV * porcentajePorItem / 100).toFixed(2);
-
+        const importePorItem = (baseImponible * porcentajePorItem / 100).toFixed(2);
+    
         for (let i = 0; i < cantidadItems; i++) {
             this.addNewItem({
                 importe: importePorItem,
                 porcentaje: porcentajePorItem.toFixed(2)
             });
         }
-
+    
         // Actualizar otros cargos después de crear los nuevos items
         this.handleOtrosCargosChange();
     }

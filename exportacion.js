@@ -235,7 +235,7 @@ class ExcelExporter {
                 const codigoDetraccion = (document.getElementById('codigoBien').value.split(' - ')[0] || '').padStart(3, '0');
                 
                 // Formatear Información Adicional - usar puntos si faltan valores
-                const infoAdicional = `..01....5.01.${codigoDetraccion || '.'}.......`;
+                const infoAdicional = `...01....5.01.${codigoDetraccion || '.'}.......`;
 
                 // Obtener valores con fallback a punto
                 const cuentaContable = formData.cuentaContableSearch || '.';
@@ -321,6 +321,8 @@ class FormStorage {
             
             formData.tipoFactura = tipoFacturaValue.split('-')[0].trim();
             formData.cuentaContableSearch = cuentaContableValue.split(' - ')[0].trim();
+            formData.baseImponible = document.getElementById('baseImponible').value;
+            formData.igv = document.getElementById('igv').value;
             
             // Agregar datos adicionales que no están en collectFormData
             const additionalFields = [
@@ -372,16 +374,35 @@ class FormStorage {
         try {
             const file = event.target.files[0];
             if (!file) return;
-
+    
             const text = await file.text();
             const formData = JSON.parse(text);
-
+    
             // Cargar datos básicos sin limpiar el formulario
             Object.entries(formData.basic).forEach(([key, value]) => {
                 const element = document.getElementById(key);
                 if (element) element.value = value;
             });
-
+    
+            // Asegurar carga específica del RUC y campo rucSearch
+            if (formData.basic.ruc) {
+                document.getElementById('ruc').value = formData.basic.ruc;
+                document.getElementById('rucSearch').value = formData.basic.ruc;
+            }
+    
+            // Cargar campos de desglose
+            if (formData.baseImponible) {
+                document.getElementById('baseImponible').value = formData.baseImponible;
+            }
+            if (formData.igv) {
+                document.getElementById('igv').value = formData.igv;
+            }
+            
+            // Manejar otros cargos - primero cargar el valor
+            if (formData.otrosCargos && formData.otrosCargos.monto) {
+                document.getElementById('otrosCargos').value = formData.otrosCargos.monto;
+            }
+    
             // Cargar datos adicionales
             if (formData.numeroComprobanteParte1) {
                 document.getElementById('numeroComprobanteParte1').value = formData.numeroComprobanteParte1;
@@ -392,13 +413,13 @@ class FormStorage {
             if (formData.cuentaContableSearch) {
                 document.getElementById('cuentaContableSearch').value = formData.cuentaContableSearch;
             }
-
+    
             // Limpiar solo la tabla de items
             const tbody = document.getElementById('itemsTableBody');
             if (tbody) {
                 tbody.innerHTML = '';
             }
-
+    
             // Cargar items uno por uno
             if (formData.items && Array.isArray(formData.items)) {
                 formData.items.forEach((item, index) => {
@@ -413,13 +434,13 @@ class FormStorage {
                         <td><input type="text" class="item-proyecto" value="${item.proyecto}"></td>
                         <td><button type="button" class="remove-btn" onclick="window.invoiceParser.removeItem(this)">Eliminar</button></td>
                     `;
-
+    
                     // Añadir la fila a la tabla
                     tbody.appendChild(newRow);
-
+    
                     // Crear selects para la nueva fila
                     window.excelDb.createSelectsForRow(newRow);
-
+    
                     // Establecer valores en los selectores customizados
                     setTimeout(() => {
                         // Línea de Negocio
@@ -454,7 +475,7 @@ class FormStorage {
                             }
                         }
                     }, 100);
-
+    
                     // Añadir event listeners para cálculos
                     const importeInput = newRow.querySelector('.item-importe');
                     const porcentajeInput = newRow.querySelector('.item-porcentaje');
@@ -465,7 +486,7 @@ class FormStorage {
                     }
                 });
             }
-
+    
             // Cargar tipo de factura correctamente
             if (formData.tipoFactura) {
                 const tipoFacturaSelect = document.getElementById('tipoFactura');
@@ -479,15 +500,41 @@ class FormStorage {
                     tipoFacturaSelect.value = matchingOption.value;
                 }
             }
-
-            // Cargar el valor de otros cargos si existe
-            if (formData.otrosCargos && formData.otrosCargos.monto) {
-                document.getElementById('otrosCargos').value = formData.otrosCargos.monto;
+    
+            // Calcular totales después de cargar todo
+            if (window.invoiceParser.updateTotalsAndReferences) {
+                window.invoiceParser.updateTotalsAndReferences();
             }
-
-            // Actualizar cálculos y referencias
-            window.invoiceParser.updateTotalsAndReferences();
-
+            
+            // Actualizar el totalSuma y la validación después de cargar todos los datos
+            setTimeout(() => {
+                // Asegurar que los valores estén correctamente cargados
+                const baseImponible = parseFloat(document.getElementById('baseImponible').value) || 0;
+                const igv = parseFloat(document.getElementById('igv').value) || 0;
+                const otrosCargos = parseFloat(document.getElementById('otrosCargos').value) || 0;
+                
+                // Actualizar el campo totalSuma con todos los componentes
+                const totalSuma = baseImponible + igv + otrosCargos;
+                document.getElementById('totalSuma').textContent = totalSuma.toFixed(2);
+                
+                // Actualizar validación
+                const validacionTotal = document.getElementById('validacionTotal');
+                const totalFactura = parseFloat(document.getElementById('importe').value) || 0;
+                
+                if (Math.abs(totalSuma - totalFactura) < 0.01) {
+                    validacionTotal.textContent = "✓ Los totales coinciden correctamente";
+                    validacionTotal.className = "validacion-mensaje validacion-success";
+                } else {
+                    validacionTotal.textContent = "⚠ Los totales no coinciden. Debe ajustar los valores.";
+                    validacionTotal.className = "validacion-mensaje validacion-error";
+                }
+                
+                // Forzar actualización de otros cargos
+                if (window.invoiceParser.handleOtrosCargosChange) {
+                    window.invoiceParser.handleOtrosCargosChange();
+                }
+            }, 300); // Pequeño retardo para asegurar que todo esté cargado
+    
             // Limpiar el input de archivo para permitir cargar el mismo archivo nuevamente
             event.target.value = '';
         } catch (error) {
