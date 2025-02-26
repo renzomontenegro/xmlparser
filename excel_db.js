@@ -11,17 +11,64 @@ class ExcelDatabase {
             const response = await fetch('plantillas/Plantilla_ERP.xlsx');
             const arrayBuffer = await response.arrayBuffer();
             const workbook = await XlsxPopulate.fromDataAsync(arrayBuffer);
-            
+
             this.data.porDetraccion = this.loadSheetData(workbook.sheet('PorDetracción'), 'Impuesto', 'Nombre de Impuesto');
             this.data.codDetraccion = this.loadSheetData(workbook.sheet('CodDetracción'), 'Código', 'Detalle');
             this.data.cuentasContables = this.loadSheetData(workbook.sheet('CContables'), 'Cuenta', 'Descripción');
             this.data.tipoFactura = this.loadSheetData(workbook.sheet('TipoFac'), 'Tipo', 'Detalle');
             const ccosSheet = workbook.sheet('CCOs');
             this.ccosData = this.loadCCOsData(ccosSheet);
+            const proveedoresSheet = workbook.sheet('Proveedores');
+            this.data.proveedores = this.loadProveedoresData(proveedoresSheet);
 
             this.initializeSelectors();
         } catch (error) {
             console.error('Error loading Excel data:', error);
+        }
+    }
+
+    loadProveedoresData(sheet) {
+        const proveedores = [];
+        
+        try {
+            if (!sheet) return [];
+            
+            let row = 2; // Empezar después del encabezado
+            let emptyRowCount = 0;
+            const maxEmptyRows = 5; // Para evitar bucles infinitos si hay problemas con los datos
+            
+            while (emptyRowCount < maxEmptyRows) {
+                // Intentar obtener el RUC (ID del contribuyente) - columna C
+                let rucValue = sheet.cell(`C${row}`).value();
+                
+                // Si no encontramos RUC, contamos como fila vacía y continuamos
+                if (!rucValue) {
+                    emptyRowCount++;
+                    row++;
+                    continue;
+                }
+                
+                // Si encontramos datos, reiniciamos el contador
+                emptyRowCount = 0;
+                
+                // Convertir a string para asegurar formato correcto
+                const ruc = rucValue.toString();
+                const nombreProveedor = sheet.cell(`B${row}`).value() || '';
+                const numeroProveedor = sheet.cell(`D${row}`).value() || '';
+                
+                // Guardar solo el RUC como valor, pero mostrar la información completa en la etiqueta
+                proveedores.push({
+                    value: ruc, // Solo guardamos el RUC (importante para exportaciones)
+                    label: `${ruc} - ${nombreProveedor} - ${numeroProveedor}`
+                });
+                
+                row++;
+            }
+            
+            return proveedores;
+        } catch (error) {
+            console.error('Error cargando proveedores:', error);
+            return [];
         }
     }
 
@@ -307,7 +354,89 @@ updateProyectos(selectProyecto, centroCosto) {
         this.populateSelect('porcentajeDetraccion', this.data.porDetraccion);
         this.populateSelect('codigoBien', this.data.codDetraccion);
         this.initializeSearchableSelect('cuentaContable', this.data.cuentasContables);
+        this.initializeSearchableSelect('ruc', this.data.proveedores); // Añadir esta línea
         this.populateSelect('tipoFactura', this.data.tipoFactura);
+        this.validateSearchableFields();
+    }
+
+    initializeRucSearch() {
+        const searchInput = document.getElementById('rucSearch');
+        const hiddenInput = document.getElementById('ruc');
+        const optionsContainer = document.getElementById('rucOptions');
+        
+        if (!searchInput || !optionsContainer || !hiddenInput) return;
+    
+        let searchTimeout = null;
+    
+        const showFilteredOptions = (searchTerm = '') => {
+            if (!this.data.proveedores || !Array.isArray(this.data.proveedores)) {
+                console.error('No hay datos de proveedores disponibles');
+                return;
+            }
+    
+            // Filtrar los datos
+            const filteredData = searchTerm.length > 0 
+                ? this.data.proveedores.filter(item => {
+                    const searchLower = searchTerm.toLowerCase();
+                    return (
+                        (item.ruc && item.ruc.toLowerCase().includes(searchLower)) ||
+                        (item.nombre && item.nombre.toLowerCase().includes(searchLower)) ||
+                        (item.numero && item.numero.toLowerCase().includes(searchLower))
+                    );
+                })
+                : this.data.proveedores;
+    
+            // Limpiar y llenar el contenedor de opciones
+            optionsContainer.innerHTML = '';
+            
+            if (filteredData.length === 0) {
+                const noResults = document.createElement('div');
+                noResults.className = 'select-option';
+                noResults.textContent = 'No se encontraron resultados';
+                optionsContainer.appendChild(noResults);
+            } else {
+                filteredData.forEach(item => {
+                    const option = document.createElement('div');
+                    option.className = 'select-option';
+                    option.dataset.value = item.ruc;
+                    option.innerHTML = item.label;
+                    
+                    option.addEventListener('click', () => {
+                        searchInput.value = `${item.ruc} - ${item.nombre}`;
+                        hiddenInput.value = item.ruc;
+                        optionsContainer.classList.remove('active');
+                    });
+                    
+                    optionsContainer.appendChild(option);
+                });
+            }
+    
+            optionsContainer.classList.add('active');
+        };
+    
+        // Evento de input para la búsqueda
+        searchInput.addEventListener('input', (e) => {
+            if (searchTimeout) {
+                clearTimeout(searchTimeout);
+            }
+            
+            searchTimeout = setTimeout(() => {
+                const searchTerm = e.target.value;
+                showFilteredOptions(searchTerm);
+            }, 300);
+        });
+    
+        // Mostrar todas las opciones al hacer focus
+        searchInput.addEventListener('focus', () => {
+            showFilteredOptions(searchInput.value);
+        });
+    
+        // Cerrar las opciones al hacer click fuera
+        document.addEventListener('click', (e) => {
+            if (!searchInput.contains(e.target) && !optionsContainer.contains(e.target)) {
+                optionsContainer.classList.remove('active');
+            }
+        });
     }
 
     populateSelect(elementId, data) {
@@ -330,27 +459,28 @@ updateProyectos(selectProyecto, centroCosto) {
         const optionsContainer = document.getElementById(`${elementId}Options`);
         
         if (!searchInput || !optionsContainer || !hiddenInput) return;
-
+    
         let searchTimeout = null;
-
+        let isValid = false; // Añadir esta variable para controlar validez
+    
         const showFilteredOptions = (searchTerm = '') => {
             // Asegurarnos de que tenemos acceso a los datos
-            if (!this.data.cuentasContables || !Array.isArray(this.data.cuentasContables)) {
-                console.error('No hay datos de cuentas contables disponibles');
+            if (!data || !Array.isArray(data)) {
+                console.error(`No hay datos disponibles para ${elementId}`);
                 return;
             }
-
+    
             // Filtrar los datos
             const filteredData = searchTerm.length > 0 
-                ? this.data.cuentasContables.filter(item => {
+                ? data.filter(item => {
                     const searchLower = searchTerm.toLowerCase();
                     return (
                         (item.label && item.label.toLowerCase().includes(searchLower)) ||
                         (item.value && item.value.toLowerCase().includes(searchLower))
                     );
                 })
-                : this.data.cuentasContables;
-
+                : data;
+    
             // Limpiar y llenar el contenedor de opciones
             optionsContainer.innerHTML = '';
             
@@ -367,23 +497,25 @@ updateProyectos(selectProyecto, centroCosto) {
                     option.textContent = item.label;
                     
                     option.addEventListener('click', () => {
-                        const codigo = item.value; // Este es el código sin descripción
-                        const descripcion = item.label; // Este es el valor completo
-                        console.log('Código seleccionado:', codigo);
-                        console.log('Descripción completa:', descripcion);
+                        // Aquí está el cambio: para el ruc, mostrar solo el valor
+                        if (elementId === 'ruc') {
+                            searchInput.value = item.value; // Solo mostrar el RUC
+                        } else {
+                            searchInput.value = item.label; // Para otros campos, mostrar la etiqueta completa
+                        }
                         
-                        searchInput.value = descripcion;
-                        hiddenInput.value = codigo; // Guardamos solo el código en el input hidden
+                        hiddenInput.value = item.value; // Siempre guardamos solo el código en el input hidden
+                        isValid = true;
                         optionsContainer.classList.remove('active');
                     });
                     
                     optionsContainer.appendChild(option);
                 });
             }
-
+    
             optionsContainer.classList.add('active');
         };
-
+    
         // Mejorar el evento de input para la búsqueda
         searchInput.addEventListener('input', (e) => {
             if (searchTimeout) {
@@ -395,25 +527,39 @@ updateProyectos(selectProyecto, centroCosto) {
                 showFilteredOptions(searchTerm);
             }, 300);
         });
-
+    
         // Mostrar todas las opciones al hacer focus
         searchInput.addEventListener('focus', () => {
             showFilteredOptions(searchInput.value);
         });
-
+    
         // Cerrar las opciones al hacer click fuera
         document.addEventListener('click', (e) => {
             if (!searchInput.contains(e.target) && !optionsContainer.contains(e.target)) {
                 optionsContainer.classList.remove('active');
             }
         });
-
+    
+        // Validar que se haya seleccionado un elemento de la lista
+        searchInput.addEventListener('change', () => {
+            const currentValue = searchInput.value;
+            const options = data || [];
+            
+            // Verificar si el valor actual corresponde a alguna opción
+            isValid = options.some(item => item.label === currentValue);
+            
+            if (!isValid) {
+                // Si no es válido, limpiar el valor del input hidden
+                hiddenInput.value = '';
+            }
+        });
+    
         // Mejorar la navegación con teclado
         searchInput.addEventListener('keydown', (e) => {
             const options = Array.from(optionsContainer.querySelectorAll('.select-option'));
             const selectedOption = optionsContainer.querySelector('.select-option.selected');
             let selectedIndex = options.indexOf(selectedOption);
-
+    
             switch (e.key) {
                 case 'ArrowDown':
                     e.preventDefault();
@@ -426,7 +572,7 @@ updateProyectos(selectProyecto, centroCosto) {
                         options[0].scrollIntoView({ block: 'nearest' });
                     }
                     break;
-
+    
                 case 'ArrowUp':
                     e.preventDefault();
                     if (selectedIndex > 0) {
@@ -435,7 +581,7 @@ updateProyectos(selectProyecto, centroCosto) {
                         options[selectedIndex - 1].scrollIntoView({ block: 'nearest' });
                     }
                     break;
-
+    
                 case 'Enter':
                     e.preventDefault();
                     if (selectedOption) {
@@ -443,10 +589,11 @@ updateProyectos(selectProyecto, centroCosto) {
                         const label = selectedOption.textContent;
                         searchInput.value = label;
                         hiddenInput.value = value;
+                        isValid = true;
                         optionsContainer.classList.remove('active');
                     }
                     break;
-
+    
                 case 'Escape':
                     e.preventDefault();
                     optionsContainer.classList.remove('active');
@@ -454,18 +601,88 @@ updateProyectos(selectProyecto, centroCosto) {
                     break;
             }
         });
-
+    
         // Agregar funcionalidad para limpiar la selección
         const clearSelection = () => {
             searchInput.value = '';
             hiddenInput.value = '';
+            isValid = false;
             optionsContainer.classList.remove('active');
         };
-
+    
         // Permitir borrar la selección
         searchInput.addEventListener('keyup', (e) => {
             if (e.key === 'Backspace' && searchInput.value === '') {
                 clearSelection();
+            }
+        });
+    }
+
+    validateSearchableFields() {
+        // Botones que requieren validación
+        const buttons = ['exportSolicitudBtn', 'exportERPBtn', 'downloadAllBtn', 'saveFormBtn'];
+        
+        buttons.forEach(btnId => {
+            const btn = document.getElementById(btnId);
+            if (btn) {
+                // Eliminar todos los event listeners anteriores
+                const newBtn = btn.cloneNode(true);
+                btn.parentNode.replaceChild(newBtn, btn);
+                
+                // Agregar nuestro event listener
+                newBtn.addEventListener('click', function(e) {
+                    // Primero detener el evento para prevenir cualquier acción
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    // Validar que el formulario básico sea válido
+                    const form = document.getElementById('invoiceForm');
+                    if (!form.checkValidity()) {
+                        form.reportValidity();
+                        return false;
+                    }
+                    
+                    // Validar campo RUC con verificación explícita
+                    const rucValue = document.getElementById('ruc').value;
+                    const rucSearch = document.getElementById('rucSearch').value;
+                    
+                    if (!rucValue || rucValue.trim() === '') {
+                        alert('Debe seleccionar un proveedor válido de la lista');
+                        document.getElementById('rucSearch').focus();
+                        return false;
+                    }
+                    
+                    // Validar cuenta contable con verificación explícita
+                    const cuentaValue = document.getElementById('cuentaContable').value;
+                    const cuentaSearch = document.getElementById('cuentaContableSearch').value;
+                    
+                    if (!cuentaValue || cuentaValue.trim() === '') {
+                        alert('Debe seleccionar una cuenta contable válida de la lista');
+                        document.getElementById('cuentaContableSearch').focus();
+                        return false;
+                    }
+                    
+                    // Si llegamos aquí, todo está validado correctamente
+                    console.log('Todas las validaciones pasaron, ejecutando acción...');
+                    
+                    // Ejecutar la acción correspondiente
+                    switch(btnId) {
+                        case 'exportSolicitudBtn':
+                            window.excelExporter.exportSolicitud();
+                            break;
+                        case 'exportERPBtn':
+                            window.excelExporter.exportERP();
+                            break;
+                        case 'downloadAllBtn':
+                            window.exportAll.downloadAll();
+                            break;
+                        case 'saveFormBtn':
+                            window.formStorage.saveForm();
+                            break;
+                    }
+                    
+                    return true;
+                });
             }
         });
     }

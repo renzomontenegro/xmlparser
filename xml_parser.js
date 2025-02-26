@@ -390,6 +390,24 @@ class InvoiceParser {
             }
         }
 
+        if (data.ruc) {
+            document.getElementById('ruc').value = data.ruc;
+            
+            // Intentamos encontrar el proveedor correspondiente para mostrar en el campo de búsqueda
+            const rucValue = data.ruc;
+            const proveedores = window.excelDb.data.proveedores || [];
+            const proveedor = proveedores.find(p => p.value === rucValue);
+            
+            if (data.ruc) {
+                document.getElementById('ruc').value = data.ruc;
+                
+                // Simplemente establecer el valor del RUC en el campo de búsqueda
+                document.getElementById('rucSearch').value = data.ruc;
+                
+                // No es necesario buscar el proveedor completo, ya que solo queremos mostrar el RUC
+            }
+        }
+
         // Manejar específicamente el número de comprobante
         if (data.numeroComprobanteParte1) {
             document.getElementById('numeroComprobanteParte1').value = data.numeroComprobanteParte1;

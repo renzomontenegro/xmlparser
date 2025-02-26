@@ -583,3 +583,10 @@ tr:not(.reference-row):not(.total-row):hover {
 .conditions-section li::marker {
     color: #4A90E2;
 }
+
+/*RUC Campo buscar*/
+.proveedor-numero {
+    color: #6c757d;
+    font-style: italic;
+    margin-left: 4px;
+}
