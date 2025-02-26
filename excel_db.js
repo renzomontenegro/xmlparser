@@ -4,6 +4,7 @@ class ExcelDatabase {
         this.data = {};
         this.searchTimeout = null;
         this.initializeData();
+        this.initializeRequiredFields();
     }
 
     async initializeData() {
@@ -614,6 +615,54 @@ updateProyectos(selectProyecto, centroCosto) {
         searchInput.addEventListener('keyup', (e) => {
             if (e.key === 'Backspace' && searchInput.value === '') {
                 clearSelection();
+            }
+        });
+    }
+
+    initializeRequiredFields() {
+        const cuentaContableSearch = document.getElementById('cuentaContableSearch');
+        const fechaInicioLicencia = document.getElementById('fechaInicioLicencia');
+        const fechaFinLicencia = document.getElementById('fechaFinLicencia');
+        
+        // Cuentas que requieren fechas de licencia
+        const cuentasConFechasRequeridas = [
+            '6530011000', // MEMBRESIAS
+            '6540011000', // SUSCRIPCIONES LICENCIAS SOFTWARE
+            '6093515000', // CENDOC: SUSCRIPCIONES Y PUBLICACIONES
+            '6093516000'  // CENDOC: BASE DE DATOS EN LINEA
+        ];
+        
+        // Función para verificar si la cuenta actual requiere fechas
+        const updateRequiredStatus = () => {
+            const currentValue = cuentaContableSearch.value;
+            const cuentaCode = currentValue.split(' - ')[0].trim();
+            
+            // Verificar si la cuenta actual está en la lista de cuentas que requieren fechas
+            const requireDates = cuentasConFechasRequeridas.includes(cuentaCode);
+            
+            // Actualizar el atributo required
+            fechaInicioLicencia.required = requireDates;
+            fechaFinLicencia.required = requireDates;
+            
+            // Opcional: Añadir/quitar una clase para resaltar campos requeridos
+            if (requireDates) {
+                fechaInicioLicencia.classList.add('required-field');
+                fechaFinLicencia.classList.add('required-field');
+            } else {
+                fechaInicioLicencia.classList.remove('required-field');
+                fechaFinLicencia.classList.remove('required-field');
+            }
+        };
+        
+        // Añadir el evento para actualizar cuando cambia la cuenta
+        cuentaContableSearch.addEventListener('change', updateRequiredStatus);
+        
+        // También verificar cuando se selecciona una opción del dropdown
+        document.addEventListener('click', (e) => {
+            if (e.target.classList.contains('select-option') && 
+                e.target.closest('#cuentaContableOptions')) {
+                // Dar tiempo a que se actualice el valor
+                setTimeout(updateRequiredStatus, 100);
             }
         });
     }
