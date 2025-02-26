@@ -723,7 +723,7 @@ updateProyectos(selectProyecto, centroCosto) {
                             window.excelExporter.exportERP();
                             break;
                         case 'downloadAllBtn':
-                            window.exportAll.downloadAll();
+                            window.exportAllManager.downloadAll();
                             break;
                         case 'saveFormBtn':
                             window.formStorage.saveForm();

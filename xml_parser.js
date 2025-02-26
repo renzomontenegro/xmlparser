@@ -44,8 +44,8 @@ class InvoiceParser {
                             window.excelExporter.exportERP();
                             break;
                         case 'downloadAllBtn':
-                            window.exportAll.downloadAll();
-                            break;
+                                window.exportAllManager.downloadAll();
+                                break;
                     }
                 } else {
                     form.reportValidity();

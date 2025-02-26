@@ -353,7 +353,7 @@ class FormStorage {
             // Generar nombre de archivo basado en el número de comprobante o fecha
             const comprobante = formData.basic.numeroComprobante || 'formulario';
             const fecha = new Date().toISOString().split('T')[0];
-            const fileName = `${comprobante}_${fecha}.json`;
+            const fileName = `Backup_${comprobante}_${fecha}.json`;
 
             // Crear y activar enlace de descarga
             const url = window.URL.createObjectURL(blob);
