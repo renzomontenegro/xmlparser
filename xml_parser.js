@@ -416,7 +416,6 @@ class InvoiceParser {
 
         // Limpiar items existentes y agregar nueva fila
         this.clearItems();
-        this.addNewItem();
 
         // Manejar el número de comprobante
         if (data.numeroComprobante) {
@@ -778,7 +777,6 @@ class InvoiceParser {
         otrosCargosInput.addEventListener('input', calcularTotales);
         importeInput.addEventListener('input', calcularTotales);
         
-        // Botón recalcular - ajusta la base imponible para que la suma coincida con el total factura
         recalcularBtn.addEventListener('click', () => {
             const totalFactura = parseFloat(importeInput.value) || 0;
             const otrosCargos = parseFloat(otrosCargosInput.value) || 0;
@@ -801,6 +799,9 @@ class InvoiceParser {
             baseImponibleInput.value = baseCalculada.toFixed(2);
             igvInput.value = (baseCalculada * 0.18).toFixed(2);
             calcularTotales();
+            
+            // Añadir esta línea para actualizar los importes de los items
+            this.updateItemImportes(baseCalculada);
         });
     }
 
