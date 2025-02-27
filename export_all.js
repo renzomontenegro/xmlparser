@@ -40,6 +40,22 @@ class ExportAllManager {
                 cuentaContableSearch: cuentaContableCodigo // Usar solo el código
             };
 
+            // Añadir información del número Oracle
+            let numeroOracle = '';
+            const rucValue = formData.basic.ruc;
+            
+            // Buscar el número Oracle en la lista de proveedores
+            if (window.excelDb && window.excelDb.data && window.excelDb.data.proveedores) {
+                const proveedor = window.excelDb.data.proveedores.find(p => p.value === rucValue);
+                if (proveedor && proveedor.label) {
+                    const parts = proveedor.label.split(' - ');
+                    if (parts.length >= 3) {
+                        numeroOracle = parts[2].trim();
+                        additionalFields.numeroOracle = numeroOracle;
+                    }
+                }
+            }
+
             // Combinar los datos
             const completeFormData = {
                 ...formData,
@@ -50,7 +66,7 @@ class ExportAllManager {
 
             // 1. Añadir el JSON con los datos completos
             const jsonBlob = new Blob([JSON.stringify(completeFormData, null, 2)], { type: 'application/json' });
-            zip.file(`${comprobante}_${timestamp}.json`, jsonBlob);
+            zip.file(`Backup_${comprobante}_${timestamp}.json`, jsonBlob);
 
             // 2. Obtener y añadir el Excel de resumen
             const resumenBlob = await window.excelExporter.exportSolicitud({ returnBlob: true });

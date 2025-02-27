@@ -152,6 +152,7 @@ class ExcelExporter {
         }
     }
 
+    // Localiza esta sección en el método exportERP de la clase ExcelExporter
     async exportERP(options = {}) {
         const form = document.getElementById('invoiceForm');
         if (!form.checkValidity()) {
@@ -164,19 +165,19 @@ class ExcelExporter {
             const workbook = await XlsxPopulate.fromDataAsync(arrayBuffer);
             const sheet = workbook.sheet('MACRO ORACLE');
             const formData = window.invoiceParser.collectFormData();
-    
+
             // Funciones de formateo de fecha
             const formatDate = (dateStr) => {
                 const [year, month, day] = dateStr.split('-');
                 return `${day}/${month}/${year}`;
             };
-    
+
             const formatDateToSpanish = (dateStr) => {
                 const [year, month, day] = dateStr.split('-');
                 const months = ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC'];
                 return `${parseInt(day)} ${months[parseInt(month) - 1]}`;
             };
-    
+
             // Formatear fechas
             const fechaEmisionFormateada = formatDate(formData.basic.fechaEmision);
             
@@ -187,11 +188,26 @@ class ExcelExporter {
                 month: '2-digit',
                 year: 'numeric'
             });
-    
+
             // Extraer número de factura y construir descripción
             const facturaNum = formData.basic.numeroComprobante.split('-')[1] || '';
             const baseDescription = `${formData.basic.razonSocial} ${formData.basic.descripcion}`;
-    
+            
+            // Obtener el número Oracle del proveedor
+            let numeroOracle = '';
+            const rucValue = formData.basic.ruc;
+            
+            // Buscar el número Oracle en la lista de proveedores
+            if (window.excelDb && window.excelDb.data && window.excelDb.data.proveedores) {
+                const proveedor = window.excelDb.data.proveedores.find(p => p.value === rucValue);
+                if (proveedor && proveedor.label) {
+                    const parts = proveedor.label.split(' - ');
+                    if (parts.length >= 3) {
+                        numeroOracle = parts[2].trim();
+                    }
+                }
+            }
+
             // Procesar items normales y otros cargos
             let allItems = [...formData.items];
             if (formData.otrosCargos) {
@@ -200,7 +216,7 @@ class ExcelExporter {
 
             allItems.forEach((item, index) => {
                 const rowNum = 9 + index;
-    
+
                 sheet.cell(`E${rowNum}`).value('1');
                 sheet.cell(`F${rowNum}`).value('UNIVERSIDAD ESAN BU');
                 sheet.cell(`G${rowNum}`).value('EYARASCA');
@@ -210,7 +226,7 @@ class ExcelExporter {
                 sheet.cell(`K${rowNum}`).value(fechaEmisionFormateada);
                 sheet.cell(`L${rowNum}`).value(formData.basic.razonSocial);
                 sheet.cell(`M${rowNum}`).value(formData.basic.ruc);
-                sheet.cell(`N${rowNum}`).value('');
+                sheet.cell(`N${rowNum}`).value(numeroOracle); // Colocar el número Oracle en la columna N
                 sheet.cell(`O${rowNum}`).value('');
                 sheet.cell(`P${rowNum}`).value('Estándar');
                 sheet.cell(`Q${rowNum}`).value(baseDescription);
@@ -249,13 +265,13 @@ class ExcelExporter {
                 sheet.cell(`BX${rowNum}`).value(infoAdicional);
                 sheet.cell(`CS${rowNum}`).value(combinacionDistribucion);
             });
-    
+
             const blob = await workbook.outputAsync();
             
             if (options?.returnBlob) {
                 return blob;
             }
-    
+
             const fileName = `Formato_ERP_${formData.basic.numeroComprobante}.xlsx`;
             this.createTemporaryDownload(fileName, blob);
         } catch (error) {
