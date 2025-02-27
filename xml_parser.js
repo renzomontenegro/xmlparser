@@ -379,6 +379,7 @@ class InvoiceParser {
         return currencyText;
     }
 
+
     populateForm(data) {
         // Crear una lista de campos que NO deben ser autocompletados
         const excludeFields = [
@@ -386,6 +387,7 @@ class InvoiceParser {
             'codigoBien',
             'cuentaContable',
             'tipoFactura',
+            'razonSocial', // Añadido para excluir específicamente este campo
         ];
 
         // Poblar solo los campos que no están en la lista de exclusión
@@ -399,19 +401,8 @@ class InvoiceParser {
         if (data.ruc) {
             document.getElementById('ruc').value = data.ruc;
             
-            // Intentamos encontrar el proveedor correspondiente para mostrar en el campo de búsqueda
-            const rucValue = data.ruc;
-            const proveedores = window.excelDb.data.proveedores || [];
-            const proveedor = proveedores.find(p => p.value === rucValue);
-            
-            if (data.ruc) {
-                document.getElementById('ruc').value = data.ruc;
-                
-                // Simplemente establecer el valor del RUC en el campo de búsqueda
-                document.getElementById('rucSearch').value = data.ruc;
-                
-                // No es necesario buscar el proveedor completo, ya que solo queremos mostrar el RUC
-            }
+            // Simplemente establecer el valor del RUC en el campo de búsqueda
+            document.getElementById('rucSearch').value = data.ruc;
         }
 
         // Manejar específicamente el número de comprobante

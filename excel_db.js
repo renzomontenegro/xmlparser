@@ -501,6 +501,18 @@ updateProyectos(selectProyecto, centroCosto) {
                         // Aquí está el cambio: para el ruc, mostrar solo el valor
                         if (elementId === 'ruc') {
                             searchInput.value = item.value; // Solo mostrar el RUC
+                            
+                            // NUEVO: Autocompletar el campo de razón social
+                            if (item.label && item.label.includes(' - ')) {
+                                const parts = item.label.split(' - ');
+                                if (parts.length >= 2) {
+                                    const razonSocial = parts[1].trim();
+                                    const razonSocialInput = document.getElementById('razonSocial');
+                                    if (razonSocialInput) {
+                                        razonSocialInput.value = razonSocial;
+                                    }
+                                }
+                            }
                         } else {
                             searchInput.value = item.label; // Para otros campos, mostrar la etiqueta completa
                         }
@@ -588,7 +600,25 @@ updateProyectos(selectProyecto, centroCosto) {
                     if (selectedOption) {
                         const value = selectedOption.dataset.value;
                         const label = selectedOption.textContent;
-                        searchInput.value = label;
+                        
+                        if (elementId === 'ruc') {
+                            searchInput.value = value; // Solo mostrar el RUC para este campo
+                            
+                            // NUEVO: Autocompletar el campo de razón social también para la tecla Enter
+                            if (label && label.includes(' - ')) {
+                                const parts = label.split(' - ');
+                                if (parts.length >= 2) {
+                                    const razonSocial = parts[1].trim();
+                                    const razonSocialInput = document.getElementById('razonSocial');
+                                    if (razonSocialInput) {
+                                        razonSocialInput.value = razonSocial;
+                                    }
+                                }
+                            }
+                        } else {
+                            searchInput.value = label; // Mostrar la etiqueta completa para otros campos
+                        }
+                        
                         hiddenInput.value = value;
                         isValid = true;
                         optionsContainer.classList.remove('active');
