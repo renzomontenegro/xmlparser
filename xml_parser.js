@@ -185,9 +185,6 @@ class InvoiceParser {
             
             // Limpiar la tabla de items
             this.clearItems();
-            
-            // Agregar una fila vacía en la tabla de items
-            this.addNewItem();
         }
     }
 
@@ -517,7 +514,7 @@ class InvoiceParser {
         // Usar valores del desglose si están disponibles
         const baseImponibleInput = document.getElementById('baseImponible');
         const baseImponible = parseFloat(baseImponibleInput.value) || 0;
-        const importeSinIGV = baseImponible > 0 ? baseImponible : (importeTotal / 1.18);
+        const importeSinIGV = baseImponible;
     
         // Remover filas de totales existentes si hay
         ['totalRow', 'importeSinIGVRow', 'importeConIGVRow'].forEach(id => {
@@ -558,7 +555,7 @@ class InvoiceParser {
         importeSinIGVRow.id = 'importeSinIGVRow';
         importeSinIGVRow.classList.add('reference-row');
         importeSinIGVRow.innerHTML = `
-            <td><strong>Importe SIN IGV (-18%):</strong></td>
+            <td><strong>Base Imponible:</strong></td>
             <td class="text-right">${importeSinIGV.toFixed(2)}</td>
             <td colspan="5"></td>
         `;
