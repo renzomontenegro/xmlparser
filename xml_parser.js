@@ -5,6 +5,13 @@ class InvoiceParser {
             'cac': 'urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2',
             'sac': 'urn:sunat:names:specification:ubl:peru:schema:xsd:SunatAggregateComponents-1'
         };
+        
+        // Determinar qué proveedor de base de datos usar
+        this.dbProvider = window.googleSheetsDb;
+        if (!this.dbProvider) {
+            console.error('No se encontró un proveedor de base de datos válido');
+        }
+        
         this.initializeEventListeners();
         this.initializeComprobanteFormat();
         this.initializeRucValidation();
@@ -255,6 +262,10 @@ class InvoiceParser {
                 importe = this.getElementValue(xmlDoc, "PayableAmount");
             }
 
+            // Obtener valores para desglose
+            const baseImponible = this.getElementValue(xmlDoc, "TaxableAmount") || this.getElementValue(xmlDoc, "LineExtensionAmount");
+            const igv = this.getElementValue(xmlDoc, "TaxAmount");
+
             // Resto de la lógica para obtener otros campos...
             const result = {
                 ruc: this.getElementValue(xmlDoc, "ID", xmlDoc.querySelector("*|AccountingSupplierParty")),
@@ -265,6 +276,8 @@ class InvoiceParser {
                 numeroComprobanteParte2: parte2,
                 numeroComprobante: `${parte1}-${parte2}`,
                 importe: this.getElementValue(xmlDoc, "PayableAmount") || this.getElementValue(xmlDoc, "TaxInclusiveAmount"),
+                baseImponible: baseImponible,
+                igv: igv,
                 solicitante: '',
                 descripcion: '',
                 fechaInicioLicencia: '',
@@ -272,6 +285,16 @@ class InvoiceParser {
                 areaSolicitante: '',
                 items: []
             };
+
+            // Intentar obtener descripción del primer item
+            const invoiceLines = this.getElements(xmlDoc, "InvoiceLine");
+            if (invoiceLines.length > 0) {
+                const firstLine = invoiceLines[0];
+                const description = this.getElementValue(firstLine, "Description");
+                if (description) {
+                    result.descripcion = description;
+                }
+            }
 
             return result;
 
@@ -324,30 +347,6 @@ class InvoiceParser {
         return '';
     }
 
-    parseInvoiceItems(xmlDoc) {
-        const items = [];
-        const invoiceLines = this.getElements(xmlDoc, "InvoiceLine");
-        const totalAmount = parseFloat(this.getElementValue(xmlDoc, "PayableAmount")) || 0;
-
-        for (let i = 0; i < invoiceLines.length; i++) {
-            const line = invoiceLines[i];
-            const priceAmount = this.getElementValue(line, "PriceAmount");
-            const quantity = parseFloat(this.getElementValue(line, "InvoicedQuantity")) || 1;
-            const itemAmount = parseFloat(priceAmount) * quantity;
-
-            items.push({
-                numeroItem: i + 1,
-                importe: itemAmount.toFixed(2),
-                porcentaje: totalAmount ? ((itemAmount / totalAmount) * 100).toFixed(2) : '0',
-                lineaNegocio: '',
-                centroCosto: '',
-                proyecto: ''
-            });
-        }
-
-        return items;
-    }
-
     getXMLValue(xmlDoc, xpath, defaultValue = '') {
         try {
             const result = xmlDoc.evaluate(
@@ -375,7 +374,6 @@ class InvoiceParser {
         if (currencyText.includes('DOLAR') || currencyText === 'USD') return 'USD';
         return currencyText;
     }
-
 
     populateForm(data) {
         // Crear una lista de campos que NO deben ser autocompletados
@@ -414,6 +412,14 @@ class InvoiceParser {
             document.getElementById('numeroComprobante').value = data.numeroComprobante;
         }
 
+        // Rellenar campos de desglose
+        if (data.baseImponible) {
+            document.getElementById('baseImponible').value = data.baseImponible;
+            // Calcular IGV automáticamente (18%)
+            const baseImponible = parseFloat(data.baseImponible) || 0;
+            document.getElementById('igv').value = (baseImponible * 0.18).toFixed(2);
+        }
+
         // Limpiar items existentes y agregar nueva fila
         this.clearItems();
 
@@ -424,6 +430,12 @@ class InvoiceParser {
             document.getElementById('numeroComprobanteParte2').value = parte2 || '';
             document.getElementById('numeroComprobante').value = data.numeroComprobante;
         }
+
+        // Agregar un item inicial
+        this.addNewItem();
+
+        // Actualizar los totales
+        this.updateTotalsAndReferences();
     }
 
     clearItems() {
@@ -452,7 +464,12 @@ class InvoiceParser {
             <td><button type="button" class="remove-btn" onclick="window.invoiceParser.removeItem(this)">Eliminar</button></td>
         `;
         
-        window.excelDb.createSelectsForRow(newRow);
+        // Usar el proveedor de base de datos detectado (googleSheetsDb o excelDb)
+        if (this.dbProvider) {
+            this.dbProvider.createSelectsForRow(newRow);
+        } else {
+            console.error('No se encontró un proveedor de base de datos válido para createSelectsForRow');
+        }
         
         // Insertar la nueva fila antes de la fila de totales si existe
         const totalRow = document.getElementById('totalRow');
@@ -577,7 +594,6 @@ class InvoiceParser {
             this.handleOtrosCargosChange();
         }
     }
-
 
     removeItem(button) {
         const row = button.closest('tr');
@@ -727,194 +743,194 @@ class InvoiceParser {
         return formData;
     }
 
-    initializeDesgloseFactura() {
-        const baseImponibleInput = document.getElementById('baseImponible');
-        const igvInput = document.getElementById('igv');
-        const otrosCargosInput = document.getElementById('otrosCargos');
-        const totalSumaSpan = document.getElementById('totalSuma');
-        const importeInput = document.getElementById('importe');
-        const validacionTotal = document.getElementById('validacionTotal');
-        const recalcularBtn = document.getElementById('recalcularBtn');
-    
-        // Función para calcular totales
-        const calcularTotales = () => {
-            const baseImponible = parseFloat(baseImponibleInput.value) || 0;
-            const igv = parseFloat(igvInput.value) || 0;
-            const otrosCargos = parseFloat(otrosCargosInput.value) || 0;
-            
-            // Calcular suma total
-            const suma = baseImponible + igv + otrosCargos;
-            totalSumaSpan.textContent = suma.toFixed(2);
-            
-            // Validar si coincide con el total factura
-            const totalFactura = parseFloat(importeInput.value) || 0;
-            
-            if (Math.abs(suma - totalFactura) < 0.01) { // Tolerancia para problemas de redondeo
-                validacionTotal.textContent = "✓ Los totales coinciden correctamente";
-                validacionTotal.className = "validacion-mensaje validacion-success";
-            } else {
-                validacionTotal.textContent = "⚠ Los totales no coinciden. Debe ajustar los valores.";
-                validacionTotal.className = "validacion-mensaje validacion-error";
-            }
-            
-            // Actualizar la tabla de referencia
-            this.updateTotalsAndReferences();
-        };
+        initializeDesgloseFactura() {
+            const baseImponibleInput = document.getElementById('baseImponible');
+            const igvInput = document.getElementById('igv');
+            const otrosCargosInput = document.getElementById('otrosCargos');
+            const totalSumaSpan = document.getElementById('totalSuma');
+            const importeInput = document.getElementById('importe');
+            const validacionTotal = document.getElementById('validacionTotal');
+            const recalcularBtn = document.getElementById('recalcularBtn');
         
-        
-        // Calcular IGV automáticamente cuando cambia la base imponible
-        baseImponibleInput.addEventListener('input', () => {
-            const baseImponible = parseFloat(baseImponibleInput.value) || 0;
-            igvInput.value = (baseImponible * 0.18).toFixed(2);
-            calcularTotales();
+            // Función para calcular totales
+            const calcularTotales = () => {
+                const baseImponible = parseFloat(baseImponibleInput.value) || 0;
+                const igv = parseFloat(igvInput.value) || 0;
+                const otrosCargos = parseFloat(otrosCargosInput.value) || 0;
+                
+                // Calcular suma total
+                const suma = baseImponible + igv + otrosCargos;
+                totalSumaSpan.textContent = suma.toFixed(2);
+                
+                // Validar si coincide con el total factura
+                const totalFactura = parseFloat(importeInput.value) || 0;
+                
+                if (Math.abs(suma - totalFactura) < 0.01) { // Tolerancia para problemas de redondeo
+                    validacionTotal.textContent = "✓ Los totales coinciden correctamente";
+                    validacionTotal.className = "validacion-mensaje validacion-success";
+                } else {
+                    validacionTotal.textContent = "⚠ Los totales no coinciden. Debe ajustar los valores.";
+                    validacionTotal.className = "validacion-mensaje validacion-error";
+                }
+                
+                // Actualizar la tabla de referencia
+                this.updateTotalsAndReferences();
+            };
             
-            // Actualizar los importes de los items según sus porcentajes
-            this.updateItemImportes(baseImponible);
-        });
-        
-        // Recalcular suma cuando cambia cualquier valor
-        igvInput.addEventListener('input', calcularTotales);
-        otrosCargosInput.addEventListener('input', calcularTotales);
-        importeInput.addEventListener('input', calcularTotales);
-        
-        recalcularBtn.addEventListener('click', () => {
-            const totalFactura = parseFloat(importeInput.value) || 0;
-            const otrosCargos = parseFloat(otrosCargosInput.value) || 0;
             
-            // Si no hay total factura, no podemos calcular
-            if (totalFactura <= 0) {
-                alert('Debe ingresar un Total Factura válido para recalcular');
-                return;
-            }
+            // Calcular IGV automáticamente cuando cambia la base imponible
+            baseImponibleInput.addEventListener('input', () => {
+                const baseImponible = parseFloat(baseImponibleInput.value) || 0;
+                igvInput.value = (baseImponible * 0.18).toFixed(2);
+                calcularTotales();
+                
+                // Actualizar los importes de los items según sus porcentajes
+                this.updateItemImportes(baseImponible);
+            });
             
-            // Calcular la base imponible necesaria para que cuadre
-            // Base = (Total - OtrosCargos) / 1.18
-            const baseCalculada = (totalFactura - otrosCargos) / 1.18;
+            // Recalcular suma cuando cambia cualquier valor
+            igvInput.addEventListener('input', calcularTotales);
+            otrosCargosInput.addEventListener('input', calcularTotales);
+            importeInput.addEventListener('input', calcularTotales);
             
-            if (baseCalculada < 0) {
-                alert('El valor de Otros Cargos es mayor que el Total Factura. Por favor, ajuste los valores.');
-                return;
-            }
-            
-            baseImponibleInput.value = baseCalculada.toFixed(2);
-            igvInput.value = (baseCalculada * 0.18).toFixed(2);
-            calcularTotales();
-            
-            // Añadir esta línea para actualizar los importes de los items
-            this.updateItemImportes(baseCalculada);
-        });
-    }
-
-    updateItemImportes(baseImponible) {
-        const tbody = document.getElementById('itemsTableBody');
-        const items = tbody.querySelectorAll('tr:not(.total-row):not(#totalRow):not(#importeSinIGVRow):not(#importeConIGVRow)');
-        
-        items.forEach(row => {
-            const importeInput = row.querySelector('.item-importe');
-            const porcentajeInput = row.querySelector('.item-porcentaje');
-            
-            if (importeInput && porcentajeInput) {
-                const porcentaje = parseFloat(porcentajeInput.value) || 0;
-                // Calcula el nuevo importe basado en el porcentaje y la nueva base imponible
-                const nuevoImporte = baseImponible * (porcentaje / 100);
-                importeInput.value = nuevoImporte.toFixed(2);
-            }
-        });
-        
-        // Actualizar los totales y referencias después de modificar los items
-        this.updateTotalsAndReferences();
-    }
-
-    initializeNewFields() {
-        const cantidadItemsInput = document.getElementById('cantidadItems');
-        const otrosCargosInput = document.getElementById('otrosCargos');
-
-        cantidadItemsInput.addEventListener('input', () => this.handleCantidadItemsChange());
-        otrosCargosInput.addEventListener('input', () => this.handleOtrosCargosChange());
-    }
-
-    handleCantidadItemsChange() {
-        const cantidadItems = parseInt(document.getElementById('cantidadItems').value);
-        if (!cantidadItems || isNaN(cantidadItems)) return;
-    
-        this.clearItems(); // Limpiar items existentes
-        
-        // Obtener la base imponible actual directamente
-        const baseImponible = parseFloat(document.getElementById('baseImponible').value) || 0;
-        const porcentajePorItem = 100 / cantidadItems;
-        const importePorItem = (baseImponible * porcentajePorItem / 100).toFixed(2);
-    
-        for (let i = 0; i < cantidadItems; i++) {
-            this.addNewItem({
-                importe: importePorItem,
-                porcentaje: porcentajePorItem.toFixed(2)
+            recalcularBtn.addEventListener('click', () => {
+                const totalFactura = parseFloat(importeInput.value) || 0;
+                const otrosCargos = parseFloat(otrosCargosInput.value) || 0;
+                
+                // Si no hay total factura, no podemos calcular
+                if (totalFactura <= 0) {
+                    alert('Debe ingresar un Total Factura válido para recalcular');
+                    return;
+                }
+                
+                // Calcular la base imponible necesaria para que cuadre
+                // Base = (Total - OtrosCargos) / 1.18
+                const baseCalculada = (totalFactura - otrosCargos) / 1.18;
+                
+                if (baseCalculada < 0) {
+                    alert('El valor de Otros Cargos es mayor que el Total Factura. Por favor, ajuste los valores.');
+                    return;
+                }
+                
+                baseImponibleInput.value = baseCalculada.toFixed(2);
+                igvInput.value = (baseCalculada * 0.18).toFixed(2);
+                calcularTotales();
+                
+                // Añadir esta línea para actualizar los importes de los items
+                this.updateItemImportes(baseCalculada);
             });
         }
     
-        // Actualizar otros cargos después de crear los nuevos items
-        this.handleOtrosCargosChange();
-    }
-
-    handleOtrosCargosChange() {
-        const otrosCargos = parseFloat(document.getElementById('otrosCargos').value);
-        if (!otrosCargos || isNaN(otrosCargos)) {
-            this.otrosCargosList = [];
-            return;
+        updateItemImportes(baseImponible) {
+            const tbody = document.getElementById('itemsTableBody');
+            const items = tbody.querySelectorAll('tr:not(.total-row):not(#totalRow):not(#importeSinIGVRow):not(#importeConIGVRow)');
+            
+            items.forEach(row => {
+                const importeInput = row.querySelector('.item-importe');
+                const porcentajeInput = row.querySelector('.item-porcentaje');
+                
+                if (importeInput && porcentajeInput) {
+                    const porcentaje = parseFloat(porcentajeInput.value) || 0;
+                    // Calcula el nuevo importe basado en el porcentaje y la nueva base imponible
+                    const nuevoImporte = baseImponible * (porcentaje / 100);
+                    importeInput.value = nuevoImporte.toFixed(2);
+                }
+            });
+            
+            // Actualizar los totales y referencias después de modificar los items
+            this.updateTotalsAndReferences();
         }
     
-        const itemsActuales = Array.from(document.querySelectorAll('#itemsTableBody tr:not(.total-row):not([id])'));
-        
-        // Obtenemos los valores actuales directamente de la interfaz
-        this.otrosCargosList = itemsActuales.map(row => {
-            const porcentaje = parseFloat(row.querySelector('.item-porcentaje').value) || 0;
-            const importeProporcional = (otrosCargos * porcentaje / 100).toFixed(2);
-            
-            // Obtener los valores actuales de los selects
-            const lineaNegocioValue = row.querySelector('.item-lineaNegocio').value || '';
-            const centroCostoValue = row.querySelector('.item-centroCosto').value || '';
-            
-            // Importante: Obtener el valor ACTUAL del select de proyecto
-            const proyectoSelect = row.querySelector('.item-proyecto');
-            const proyectoValue = proyectoSelect ? proyectoSelect.value : '00000000000';
-            
-            
-            return {
-                importe: importeProporcional,
-                porcentaje: porcentaje,
-                lineaNegocio: lineaNegocioValue,
-                centroCosto: centroCostoValue,
-                proyecto: proyectoValue // Usamos el valor actual del select
-            };
-        });
-        
-        console.log('Lista actualizada de otros cargos:', this.otrosCargosList);
-    }
-
-    updateOtrosCargosList(items, otrosCargos) {
-        this.otrosCargosList = items.map(row => {
-            const porcentaje = parseFloat(row.querySelector('.item-porcentaje').value) || 0;
-            const importeProporcional = (otrosCargos * porcentaje / 100).toFixed(2);
-            
-            return {
-                importe: importeProporcional,
-                porcentaje: porcentaje,
-                lineaNegocio: row.querySelector('.item-lineaNegocio').value || '',
-                centroCosto: row.querySelector('.item-centroCosto')?.value || '',
-                proyecto: row.querySelector('.item-proyecto').value || '00000000000'
-            };
-        });
-    }
-
+        initializeNewFields() {
+            const cantidadItemsInput = document.getElementById('cantidadItems');
+            const otrosCargosInput = document.getElementById('otrosCargos');
     
-}
-
-function extractProyectoCode(proyectoValue) {
-    // Si el proyecto tiene formato "código - descripción", extraer solo el código
-    if (proyectoValue && proyectoValue.includes(' - ')) {
-        return proyectoValue.split(' - ')[0].trim();
+            cantidadItemsInput.addEventListener('input', () => this.handleCantidadItemsChange());
+            otrosCargosInput.addEventListener('input', () => this.handleOtrosCargosChange());
+        }
+    
+        handleCantidadItemsChange() {
+            const cantidadItems = parseInt(document.getElementById('cantidadItems').value);
+            if (!cantidadItems || isNaN(cantidadItems)) return;
+        
+            this.clearItems(); // Limpiar items existentes
+            
+            // Obtener la base imponible actual directamente
+            const baseImponible = parseFloat(document.getElementById('baseImponible').value) || 0;
+            const porcentajePorItem = 100 / cantidadItems;
+            const importePorItem = (baseImponible * porcentajePorItem / 100).toFixed(2);
+        
+            for (let i = 0; i < cantidadItems; i++) {
+                this.addNewItem({
+                    importe: importePorItem,
+                    porcentaje: porcentajePorItem.toFixed(2)
+                });
+            }
+        
+            // Actualizar otros cargos después de crear los nuevos items
+            this.handleOtrosCargosChange();
+        }
+    
+        handleOtrosCargosChange() {
+            const otrosCargos = parseFloat(document.getElementById('otrosCargos').value);
+            if (!otrosCargos || isNaN(otrosCargos)) {
+                this.otrosCargosList = [];
+                return;
+            }
+        
+            const itemsActuales = Array.from(document.querySelectorAll('#itemsTableBody tr:not(.total-row):not([id])'));
+            
+            // Obtenemos los valores actuales directamente de la interfaz
+            this.otrosCargosList = itemsActuales.map(row => {
+                const porcentaje = parseFloat(row.querySelector('.item-porcentaje').value) || 0;
+                const importeProporcional = (otrosCargos * porcentaje / 100).toFixed(2);
+                
+                // Obtener los valores actuales de los selects
+                const lineaNegocioValue = row.querySelector('.item-lineaNegocio').value || '';
+                const centroCostoValue = row.querySelector('.item-centroCosto').value || '';
+                
+                // Importante: Obtener el valor ACTUAL del select de proyecto
+                const proyectoSelect = row.querySelector('.item-proyecto');
+                const proyectoValue = proyectoSelect ? proyectoSelect.value : '00000000000';
+                
+                
+                return {
+                    importe: importeProporcional,
+                    porcentaje: porcentaje,
+                    lineaNegocio: lineaNegocioValue,
+                    centroCosto: centroCostoValue,
+                    proyecto: proyectoValue // Usamos el valor actual del select
+                };
+            });
+            
+            console.log('Lista actualizada de otros cargos:', this.otrosCargosList);
+        }
+    
+        updateOtrosCargosList(items, otrosCargos) {
+            this.otrosCargosList = items.map(row => {
+                const porcentaje = parseFloat(row.querySelector('.item-porcentaje').value) || 0;
+                const importeProporcional = (otrosCargos * porcentaje / 100).toFixed(2);
+                
+                return {
+                    importe: importeProporcional,
+                    porcentaje: porcentaje,
+                    lineaNegocio: row.querySelector('.item-lineaNegocio').value || '',
+                    centroCosto: row.querySelector('.item-centroCosto')?.value || '',
+                    proyecto: row.querySelector('.item-proyecto').value || '00000000000'
+                };
+            });
+        }
+    
+        
     }
-    return proyectoValue || '00000000000';
-}
-
-// Crear instancia global para acceso desde HTML
-window.invoiceParser = new InvoiceParser();
+    
+    function extractProyectoCode(proyectoValue) {
+        // Si el proyecto tiene formato "código - descripción", extraer solo el código
+        if (proyectoValue && proyectoValue.includes(' - ')) {
+            return proyectoValue.split(' - ')[0].trim();
+        }
+        return proyectoValue || '00000000000';
+    }
+    
+    // Crear instancia global para acceso desde HTML
+    window.invoiceParser = new InvoiceParser();
