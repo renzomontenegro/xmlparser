@@ -34,8 +34,6 @@ class GoogleSheetsDatabase {
         
         this.initializeDatabase();
         
-        // Mostrar mensaje de inicialización
-        console.log('GoogleSheetsDatabase inicializado');
     }
 
     /**
@@ -44,37 +42,23 @@ class GoogleSheetsDatabase {
      */
     async initializeDatabase() {
         try {
-            console.log('Iniciando carga de datos desde Google Sheets');
-            
-            const loadPromises = this.sheetsToLoad.map(async (sheet) => {
-                console.log(`Cargando hoja: ${sheet}`);
-                const data = await this.fetchSheetData(sheet);
-                return data;
-            });
+            const loadPromises = this.sheetsToLoad.filter(sheet => sheet !== 'Proyectos')
+                .map(async (sheet) => {
+                    const data = await this.fetchSheetData(sheet);
+                    return data;
+                });
     
             await Promise.all(loadPromises);
             
-            console.log('Todas las hojas cargadas correctamente');
-            
-            // Preparar los datos de centros de costo
             this.prepareCCOsData();
-            
-            // ¡NUEVO! Preparar datos de proveedores
             this.prepareProveedoresData();
             
-            // Inicializar selectores
             this.initializeSelectors();
-            
-            // Inicializar campos requeridos
             this.initializeRequiredFields();
-            
-            // Validar campos de búsqueda
             this.validateSearchableFields();
-            
-            console.log('Inicialización completa de GoogleSheetsDatabase');
         } catch (error) {
             console.error('Error en initializeDatabase:', error);
-            alert('Error al cargar datos desde Google Sheets. Algunas funcionalidades pueden no estar disponibles.');
+            alert('Error al cargar datos desde Google Sheets.');
         }
     }
 
@@ -85,48 +69,30 @@ class GoogleSheetsDatabase {
      */
     async fetchSheetData(sheetName) {
         try {
+            console.log(`Iniciando carga de hoja: ${sheetName}`);
+            const startTime = performance.now();
             
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 segundos de timeout
-            
-            const response = await fetch(`${this.API_ENDPOINT}?sheet=${sheetName}`, {
-                signal: controller.signal
-            });
-            
-            clearTimeout(timeoutId);
+            const response = await fetch(`${this.API_ENDPOINT}?sheet=${sheetName}`);
             
             if (!response.ok) {
-                console.error(`HTTP error! status: ${response.status}`);
-                console.error('Response:', await response.text());
+                console.error(`Error HTTP: ${response.status}`);
+                const errorText = await response.text();
+                console.error(`Detalle del error: ${errorText}`);
                 throw new Error(`Error al cargar la hoja ${sheetName}: ${response.statusText}`);
             }
             
             const data = await response.json();
+            const endTime = performance.now();
             
-            
-            // Verificar si la hoja existe en la respuesta
-            if (!data[sheetName]) {
-                console.error(`No se encontraron datos para la hoja ${sheetName}`);
-                console.error('Datos recibidos:', data);
-                return [];
-            }
+            console.log(`Hoja ${sheetName} cargada en ${(endTime-startTime)/1000} segundos`);
+            console.log(`Cantidad de registros: ${data[sheetName]?.length || 0}`);
             
             // Guardar en caché
-            this.dataCache[sheetName] = data[sheetName];
+            this.dataCache[sheetName] = data[sheetName] || [];
             
             return this.dataCache[sheetName];
         } catch (error) {
             console.error(`Error recuperando datos de ${sheetName}:`, error);
-            
-            // Si es un error de red o timeout
-            if (error.name === 'AbortError') {
-                console.error('La solicitud excedió el tiempo de espera');
-            }
-            
-            // Imprimir detalles completos del error
-            console.error('Error completo:', error.toString());
-            console.error('Stack:', error.stack);
-            
             return [];
         }
     }
@@ -147,12 +113,7 @@ class GoogleSheetsDatabase {
      */
     prepareCCOsData() {
         try {
-            console.log('Preparando datos de Centros de Costo');
-            
-            const ccosData = this.dataCache['CCOs'] || [];
-            const proyectosData = this.dataCache['Proyectos'] || [];
-            
-            // Limpiar datos anteriores
+            // Reiniciar estructura de datos
             this.ccosData = {
                 lineasNegocio: new Set(),
                 centrosCosto: new Map(),
@@ -161,107 +122,114 @@ class GoogleSheetsDatabase {
                 ccosAntiguos: new Map(),
                 descripcionesProyecto: new Map()
             };
+    
+            const ccosData = this.dataCache['CCOs'] || [];
+            console.log('Procesando datos CCOs:', ccosData.length, 'registros');
             
-            // Procesar datos de CCOs
+            // Primera pasada: recopilar todas las líneas de negocio
             ccosData.forEach(item => {
-                if (!item.value || !item.label) return; // Omitir items inválidos
-                
-                // Extraer información
-                const centroCosto = item.value;
-                let descripcion = '';
-                
-                // Extraer descripción del label (formato típico: "codigo - descripción")
-                if (item.label && item.label.includes(' - ')) {
-                    const parts = item.label.split(' - ');
-                    if (parts.length >= 2) {
-                        descripcion = parts[1].trim();
-                    }
-                }
-                
-                // Extraer información adicional (campos personalizados desde Google Sheets)
+                // Esto ahora incluirá filas donde el value puede ser un row_X
                 const lineaNegocio = item.extra1 || '';
-                const proyecto = item.extra2 || '';
-                const ccoAntiguo = item.extra3 || '';
-                
-                // Guardar línea de negocio
-                if (lineaNegocio) {
+                if (lineaNegocio && lineaNegocio.trim() !== '') {
                     this.ccosData.lineasNegocio.add(lineaNegocio);
-                    
-                    // Crear relación línea de negocio -> centro de costo
-                    if (!this.ccosData.centrosCosto.has(lineaNegocio)) {
-                        this.ccosData.centrosCosto.set(lineaNegocio, new Set());
-                    }
-                    
-                    if (centroCosto) {
-                        this.ccosData.centrosCosto.get(lineaNegocio).add(centroCosto);
-                        this.ccosData.descripcionesCC.set(centroCosto, descripcion);
-                        this.ccosData.ccosAntiguos.set(centroCosto, ccoAntiguo);
+                }
+            });
+    
+            // Segunda pasada: procesar centros de costo y proyectos
+            ccosData.forEach(item => {
+                const lineaNegocio = item.extra1 || '';
+                const centroCosto = item.extra2 || '';
+                const proyecto = item.extra3 || '';
+                
+                // Extraer descripción del label (si existe)
+                let descripcion = '';
+                if (item.label && item.label.includes(' - ')) {
+                    descripcion = item.label.split(' - ')[1].trim();
+                }
+    
+                // Procesar si hay línea de negocio o centro de costo
+                if (lineaNegocio || centroCosto) {
+                    // Si hay línea de negocio, configurar centros de costo
+                    if (lineaNegocio) {
+                        if (!this.ccosData.centrosCosto.has(lineaNegocio)) {
+                            this.ccosData.centrosCosto.set(lineaNegocio, new Set());
+                        }
                         
-                        // Crear relación centro de costo -> proyecto
-                        if (proyecto) {
-                            if (!this.ccosData.proyectos.has(centroCosto)) {
-                                this.ccosData.proyectos.set(centroCosto, new Set());
+                        // Añadir centro de costo si existe
+                        if (centroCosto) {
+                            this.ccosData.centrosCosto.get(lineaNegocio).add(centroCosto);
+                            
+                            // Guardar descripción si existe
+                            if (descripcion) {
+                                this.ccosData.descripcionesCC.set(centroCosto, descripcion);
                             }
-                            this.ccosData.proyectos.get(centroCosto).add(proyecto);
+                            
+                            // Procesar proyecto si existe
+                            if (proyecto && proyecto !== '') {
+                                if (!this.ccosData.proyectos.has(centroCosto)) {
+                                    this.ccosData.proyectos.set(centroCosto, new Set());
+                                }
+                                this.ccosData.proyectos.get(centroCosto).add(proyecto);
+                                
+                                // También guardar descripción para el proyecto
+                                if (descripcion) {
+                                    this.ccosData.descripcionesProyecto.set(proyecto, descripcion);
+                                }
+                            }
                         }
                     }
                 }
             });
             
-            // Procesar datos adicionales de proyectos
-            proyectosData.forEach(item => {
-                if (!item.value || !item.label) return;
-                
-                const codigoProyecto = item.value;
-                let descripcionProyecto = '';
-                
-                // Extraer descripción
-                if (item.label && item.label.includes(' - ')) {
-                    const parts = item.label.split(' - ');
-                    if (parts.length >= 2) {
-                        descripcionProyecto = parts[1].trim();
-                    }
-                } else {
-                    descripcionProyecto = item.label;
-                }
-                
-                // Guardar descripción del proyecto
-                if (codigoProyecto && descripcionProyecto) {
-                    this.ccosData.descripcionesProyecto.set(codigoProyecto, descripcionProyecto);
-                }
-            });
-            
-            console.log('Datos de Centros de Costo preparados correctamente:');
-            console.log(`- Líneas de negocio: ${this.ccosData.lineasNegocio.size}`);
-            console.log(`- Centros de costo: ${this.ccosData.centrosCosto.size}`);
-            console.log(`- Proyectos: ${this.ccosData.proyectos.size}`);
+            console.log('Líneas de Negocio finales:', Array.from(this.ccosData.lineasNegocio));
+            console.log('Centros de Costo por línea:', Object.fromEntries([...this.ccosData.centrosCosto.entries()].map(
+                ([ln, ccs]) => [ln, ccs.size]
+            )));
         } catch (error) {
-            console.error('Error preparando datos de Centros de Costo:', error);
+            console.error('Error al preparar datos de Centros de Costo:', error);
+        }
+    }
+
+    async loadProjectDescriptions() {
+        try {
+            if (!this.dataCache['Proyectos']) {
+                const proyectosData = await this.fetchSheetData('Proyectos');
+                if (proyectosData) {
+                    proyectosData.forEach(item => {
+                        const projectCode = item.value;
+                        const projectDesc = item.label.split(' - ')[1] || '';
+                        
+                        if (projectCode && projectDesc) {
+                            this.ccosData.descripcionesProyecto.set(projectCode, projectDesc);
+                        }
+                    });
+                }
+            }
+        } catch (error) {
+            console.error('Error loading project descriptions:', error);
         }
     }
 
     // Agregar este método dentro de la clase GoogleSheetsDatabase
     prepareProveedoresData() {
         try {
-            
             const proveedoresData = this.dataCache['Proveedores'] || [];
             const processedProveedores = proveedoresData.map(item => {
-                // Extraer el nombre del proveedor de la parte después del guión en label
+                // Extract supplier name from label (after dash)
                 const nombreProveedor = item.label.split(' - ')[1] || ''; 
-                const ruc = item.extra1; // RUC está en extra1
+                const ruc = item.extra1; // RUC is in extra1
                 const numeroProveedor = item.extra2 || ''; 
                 
                 return {
-                    value: ruc,
+                    value: ruc, // Use RUC as value
                     label: `${ruc} - ${nombreProveedor} - ${numeroProveedor}`
                 };
             });
             
-            // Sobrescribir los datos de proveedores
+            // Override provider data with processed data
             this.dataCache['Proveedores'] = processedProveedores;
-            
         } catch (error) {
-            console.error('Error preparando datos de Proveedores:', error);
+            console.error('Error preparing Providers data:', error);
         }
     }
 
@@ -271,19 +239,22 @@ class GoogleSheetsDatabase {
      */
     createSelectsForRow(row) {
         try {
-            console.log("Creando selects para nueva fila");
-            
             // Crear selects para línea de negocio
             const tdLineaNegocio = row.cells[3];
             const selectLN = document.createElement('select');
             selectLN.className = 'item-lineaNegocio';
             selectLN.innerHTML = '<option value="">Seleccione línea de negocio...</option>';
             
-            // Añadir opciones de líneas de negocio desde ccosData
-            this.ccosData.lineasNegocio.forEach(ln => {
-                selectLN.add(new Option(ln, ln));
-            });
-
+            // Verificar si hay líneas de negocio y agregarlas al selector
+            if (this.ccosData.lineasNegocio.size === 0) {
+                console.warn('No se encontraron líneas de negocio en los datos');
+            } else {
+                // Ordenar las líneas de negocio para mejor presentación
+                Array.from(this.ccosData.lineasNegocio).sort().forEach(ln => {
+                    selectLN.add(new Option(ln, ln));
+                });
+            }
+    
             // Crear búsqueda para centro de costo
             const tdCentroCosto = row.cells[4];
             const containerCC = document.createElement('div');
@@ -298,68 +269,264 @@ class GoogleSheetsDatabase {
             hiddenCC.className = 'item-centroCosto';
             const optionsCC = document.createElement('div');
             optionsCC.className = 'select-options';
-
+    
             // Crear select para proyecto
             const tdProyecto = row.cells[5];
             const selectProyecto = document.createElement('select');
             selectProyecto.className = 'item-proyecto';
             selectProyecto.disabled = true;
-            selectProyecto.required = true;
-            selectProyecto.innerHTML = '<option value="00000000000">00000000000</option>';
-
-            // Eventos para línea de negocio
+            selectProyecto.innerHTML = '<option value="00000000000">00000000000 - Sin Proyecto</option>';
+    
+            // Eventos
             selectLN.addEventListener('change', () => {
-                console.log("Línea de negocio cambiada:", selectLN.value);
                 const lineaNegocio = selectLN.value;
                 searchCC.disabled = !lineaNegocio;
                 searchCC.value = '';
                 hiddenCC.value = '';
-                selectProyecto.innerHTML = '<option value="00000000000">00000000000</option>';
+                selectProyecto.innerHTML = '<option value="00000000000">00000000000 - Sin Proyecto</option>';
                 selectProyecto.disabled = true;
-
+    
                 if (lineaNegocio) {
                     searchCC.disabled = false;
                 }
             });
-
-            // Eventos para búsqueda de centro de costo
+    
+            // Mostrar opciones al hacer focus o click - CORREGIDO
             searchCC.addEventListener('focus', () => {
                 if (!searchCC.disabled) {
-                    this.showCentroCostoOptions(searchCC, hiddenCC, optionsCC, selectProyecto);
+                    // Obtener lineaNegocio del select en el momento del evento
+                    const lineaNegocio = selectLN.value;
+                    this.showCentroCostoOptions(lineaNegocio, searchCC, hiddenCC, optionsCC, selectProyecto);
                 }
             });
-
-            searchCC.addEventListener('input', () => {
+    
+            searchCC.addEventListener('click', () => {
                 if (!searchCC.disabled) {
-                    this.showCentroCostoOptions(searchCC, hiddenCC, optionsCC, selectProyecto);
+                    // Obtener lineaNegocio del select en el momento del evento
+                    const lineaNegocio = selectLN.value;
+                    this.showCentroCostoOptions(lineaNegocio, searchCC, hiddenCC, optionsCC, selectProyecto);
                 }
             });
-
+    
+            // Implementar búsqueda de centro de costo
+            searchCC.addEventListener('input', () => {
+                const searchTerm = searchCC.value.toLowerCase();
+                const lineaNegocio = selectLN.value; // Obtener lineaNegocio aquí
+                optionsCC.innerHTML = '';
+    
+                if (lineaNegocio && this.ccosData.centrosCosto.has(lineaNegocio)) {
+                    const centrosCosto = Array.from(this.ccosData.centrosCosto.get(lineaNegocio));
+                    const filteredCC = centrosCosto.filter(cc => {
+                        // Asegurarnos de que todos los valores existan y sean strings
+                        const ccLower = (cc || '').toString().toLowerCase();
+                        const descripcion = (this.ccosData.descripcionesCC.get(cc) || '').toString().toLowerCase();
+                        const ccoAntiguo = (this.ccosData.ccosAntiguos.get(cc) || '').toString().toLowerCase();
+    
+                        return ccLower.includes(searchTerm) || 
+                            descripcion.includes(searchTerm) ||
+                            ccoAntiguo.includes(searchTerm);
+                    });
+    
+                    filteredCC.forEach(cc => {
+                        const option = document.createElement('div');
+                        option.className = 'select-option';
+                        
+                        // CAMBIO: Mostrar solo el código del Centro de Costo
+                        option.textContent = cc;
+                        option.dataset.value = cc;
+                        
+                        option.addEventListener('click', () => {
+                            // CAMBIO: Solo mostrar el código en el campo de búsqueda
+                            searchCC.value = cc;
+                            hiddenCC.value = cc;
+                            optionsCC.style.display = 'none';
+                            this.updateProyectos(selectProyecto, cc);
+                        });
+                        
+                        optionsCC.appendChild(option);
+                    });
+                    
+                    optionsCC.style.display = filteredCC.length ? 'block' : 'none';
+                }
+            });
+    
             // Cerrar al hacer click fuera
             document.addEventListener('click', (e) => {
                 if (!searchCC.contains(e.target) && !optionsCC.contains(e.target)) {
                     optionsCC.style.display = 'none';
                 }
             });
-
+    
             // Reemplazar contenido de las celdas
             tdLineaNegocio.innerHTML = '';
             tdLineaNegocio.appendChild(selectLN);
-
+    
             tdCentroCosto.innerHTML = '';
             containerCC.appendChild(searchCC);
             containerCC.appendChild(hiddenCC);
             containerCC.appendChild(optionsCC);
             tdCentroCosto.appendChild(containerCC);
-
+    
             tdProyecto.innerHTML = '';
             tdProyecto.appendChild(selectProyecto);
-            
-            console.log("Selects creados correctamente para la nueva fila");
         } catch (error) {
-            console.error("Error al crear selects para la fila:", error);
+            console.error('Error al crear selectores para la fila:', error);
         }
     }
+    
+    
+    
+    updateProyectos(selectProyecto, centroCosto) {
+        // Inicializar con la opción de 11 ceros y hacerlo required
+        selectProyecto.innerHTML = '<option value="00000000000">00000000000 - Sin Proyecto</option>';
+        selectProyecto.disabled = !centroCosto;
+        selectProyecto.required = true; // Hacer el campo obligatorio
+    
+        if (centroCosto && this.ccosData.proyectos.has(centroCosto)) {
+            const proyectos = Array.from(this.ccosData.proyectos.get(centroCosto));
+            proyectos.forEach(proyecto => {
+                // Obtener descripción del proyecto
+                const descripcion = this.ccosData.descripcionesProyecto.get(proyecto) || '';
+                const optionText = descripcion ? `${proyecto} - ${descripcion}` : proyecto;
+                
+                selectProyecto.add(new Option(optionText, proyecto));
+            });
+        }
+    }
+
+    mostrarOpcionesCentroCosto(searchCC, hiddenCC, optionsCC, selectProyecto, lineaNegocio) {
+        if (searchCC.disabled) return;
+        
+        const searchTerm = searchCC.value.toLowerCase();
+        optionsCC.innerHTML = '';
+        
+        if (!this.ccosData.centrosCosto.has(lineaNegocio)) {
+            console.warn(`No hay centros de costo para la línea ${lineaNegocio}`);
+            return;
+        }
+        
+        const centrosCosto = Array.from(this.ccosData.centrosCosto.get(lineaNegocio));
+        const filteredCC = searchTerm ? 
+            centrosCosto.filter(cc => {
+                const descripcion = this.ccosData.descripcionesCC.get(cc) || '';
+                const ccoAntiguo = this.ccosData.ccosAntiguos.get(cc) || '';
+                return cc.toLowerCase().includes(searchTerm) || 
+                        descripcion.toLowerCase().includes(searchTerm) ||
+                        ccoAntiguo.toLowerCase().includes(searchTerm);
+            }) : centrosCosto;
+        
+        // Ordenar centros de costo para mejor experiencia
+        filteredCC.sort();
+        
+        filteredCC.forEach(cc => {
+            const option = document.createElement('div');
+            option.className = 'select-option';
+            
+            // Obtener descripción si existe
+            const descripcion = this.ccosData.descripcionesCC.get(cc) || '';
+            
+            // Formatear la opción: código + descripción
+            option.innerHTML = `
+                <span class="cc-main-content">${cc}</span>
+                ${descripcion ? `<span class="cc-description"> - ${descripcion}</span>` : ''}
+            `;
+            
+            option.dataset.value = cc;
+            
+            // Configurar evento de selección
+            option.addEventListener('click', () => {
+                // Usar solo el código en el campo de búsqueda visible
+                searchCC.value = cc;
+                hiddenCC.value = cc;
+                optionsCC.style.display = 'none';
+                
+                // Actualizar opciones de proyecto
+                this.updateProyectos(selectProyecto, cc);
+            });
+            
+            optionsCC.appendChild(option);
+        });
+        
+        optionsCC.style.display = filteredCC.length > 0 ? 'block' : 'none';
+    }
+    
+    filtrarOpcionesCentroCosto(searchTerm, lineaNegocio, optionsCC, searchCC, hiddenCC, selectProyecto) {
+        if (!this.ccosData.centrosCosto.has(lineaNegocio)) return;
+        
+        optionsCC.innerHTML = '';
+        
+        const centrosCosto = Array.from(this.ccosData.centrosCosto.get(lineaNegocio));
+        const filteredCC = centrosCosto.filter(cc => {
+            const descripcion = this.ccosData.descripcionesCC.get(cc) || '';
+            const ccoAntiguo = this.ccosData.ccosAntiguos.get(cc) || '';
+            return cc.toLowerCase().includes(searchTerm) || 
+                    descripcion.toLowerCase().includes(searchTerm) ||
+                    ccoAntiguo.toLowerCase().includes(searchTerm);
+        });
+        
+        // Ordenar centros de costo
+        filteredCC.sort();
+        
+        filteredCC.forEach(cc => {
+            const option = document.createElement('div');
+            option.className = 'select-option';
+            
+            const descripcion = this.ccosData.descripcionesCC.get(cc) || '';
+            
+            option.innerHTML = `
+                <span class="cc-main-content">${cc}</span>
+                ${descripcion ? `<span class="cc-description"> - ${descripcion}</span>` : ''}
+            `;
+            
+            option.dataset.value = cc;
+            
+            option.addEventListener('click', () => {
+                searchCC.value = cc;
+                hiddenCC.value = cc;
+                optionsCC.style.display = 'none';
+                this.updateProyectos(selectProyecto, cc);
+            });
+            
+            optionsCC.appendChild(option);
+        });
+        
+        optionsCC.style.display = filteredCC.length > 0 ? 'block' : 'none';
+    }
+    
+    
+    updateProyectos(selectProyecto, centroCosto) {
+        // Inicializar con la opción por defecto
+        selectProyecto.innerHTML = '<option value="00000000000">00000000000 - Sin Proyecto</option>';
+        selectProyecto.disabled = !centroCosto;
+        selectProyecto.required = true;
+        
+        if (!centroCosto) return;
+        
+        // Verificar si hay proyectos para este centro de costo
+        if (this.ccosData.proyectos.has(centroCosto)) {
+            const proyectos = Array.from(this.ccosData.proyectos.get(centroCosto));
+            
+            // Ordenar proyectos para mejor experiencia
+            proyectos.sort();
+            
+            proyectos.forEach(proyecto => {
+                // Ignorar la opción por defecto que ya añadimos
+                if (proyecto === '00000000000') return;
+                
+                // Obtener descripción del proyecto
+                const descripcion = this.ccosData.descripcionesProyecto.get(proyecto) || '';
+                const optionText = descripcion ? `${proyecto} - ${descripcion}` : proyecto;
+                
+                // Añadir la opción al selector
+                const option = document.createElement('option');
+                option.value = proyecto;
+                option.textContent = optionText;
+                selectProyecto.appendChild(option);
+            });
+        }
+    }
+    
+    
 
     /**
      * Muestra las opciones de centro de costo filtradas
@@ -368,68 +535,41 @@ class GoogleSheetsDatabase {
      * @param {HTMLElement} optionsCC - Contenedor de opciones
      * @param {HTMLSelectElement} selectProyecto - Select de proyectos
      */
-    showCentroCostoOptions(searchCC, hiddenCC, optionsCC, selectProyecto) {
-        try {
-            // Buscar el select de línea de negocio más cercano (dentro de la misma fila)
-            const row = searchCC.closest('tr');
-            const lineaNegocio = row.querySelector('.item-lineaNegocio').value;
-            const searchTerm = searchCC.value.toLowerCase();
-            
-            optionsCC.innerHTML = '';
-            
-            if (!lineaNegocio || !this.ccosData.centrosCosto.has(lineaNegocio)) {
-                // Si no hay línea de negocio seleccionada o no hay centros de costo asociados
-                return;
-            }
-
+    showCentroCostoOptions(lineaNegocio, searchCC, hiddenCC, optionsCC, selectProyecto) {
+        const searchTerm = searchCC.value.toLowerCase();
+        optionsCC.innerHTML = '';
+    
+        if (lineaNegocio && this.ccosData.centrosCosto.has(lineaNegocio)) {
             const centrosCosto = Array.from(this.ccosData.centrosCosto.get(lineaNegocio));
-            
-            // Filtrar según el término de búsqueda
             const filteredCC = searchTerm ? 
                 centrosCosto.filter(cc => {
                     const descripcion = this.ccosData.descripcionesCC.get(cc) || '';
                     const ccoAntiguo = this.ccosData.ccosAntiguos.get(cc) || '';
-                    
                     return cc.toLowerCase().includes(searchTerm) || 
                            descripcion.toLowerCase().includes(searchTerm) ||
                            ccoAntiguo.toLowerCase().includes(searchTerm);
                 }) : centrosCosto;
-
-            // Crear opciones para cada centro de costo filtrado
+    
             filteredCC.forEach(cc => {
                 const option = document.createElement('div');
                 option.className = 'select-option';
                 
-                // Mostrar código y descripción
-                const descripcion = this.ccosData.descripcionesCC.get(cc) || '';
+                // CAMBIO: Mostrar solo el código del Centro de Costo
                 option.textContent = cc;
-                if (descripcion) {
-                    const desc = document.createElement('span');
-                    desc.className = 'cc-description';
-                    desc.style.marginLeft = '4px';
-                    desc.style.fontSize = '0.85em';
-                    desc.style.color = '#666';
-                    desc.textContent = `- ${descripcion}`;
-                    option.appendChild(desc);
-                }
-                
                 option.dataset.value = cc;
                 
                 option.addEventListener('click', () => {
-                    searchCC.value = cc; // Mostrar solo el código en el campo de búsqueda
-                    hiddenCC.value = cc; // Guardar el código en el campo oculto
+                    // CAMBIO: Solo mostrar el código en el campo de búsqueda
+                    searchCC.value = cc;
+                    hiddenCC.value = cc;
                     optionsCC.style.display = 'none';
-                    
-                    // Actualizar proyectos disponibles
                     this.updateProyectos(selectProyecto, cc);
                 });
                 
                 optionsCC.appendChild(option);
             });
             
-            optionsCC.style.display = filteredCC.length > 0 ? 'block' : 'none';
-        } catch (error) {
-            console.error("Error al mostrar opciones de centro de costo:", error);
+            optionsCC.style.display = 'block';
         }
     }
 
@@ -439,32 +579,21 @@ class GoogleSheetsDatabase {
      * @param {string} centroCosto - Centro de costo seleccionado
      */
     updateProyectos(selectProyecto, centroCosto) {
-        try {
-            // Inicializar con la opción de 11 ceros y hacerlo required
-            selectProyecto.innerHTML = '<option value="00000000000">00000000000 - Sin Proyecto</option>';
-            selectProyecto.disabled = !centroCosto;
-            selectProyecto.required = true;
-
-            if (centroCosto && this.ccosData.proyectos.has(centroCosto)) {
-                const proyectos = Array.from(this.ccosData.proyectos.get(centroCosto));
+        // Inicializar con la opción de 11 ceros y hacerlo required
+        selectProyecto.innerHTML = '<option value="00000000000">00000000000 - Sin Proyecto</option>';
+        selectProyecto.disabled = !centroCosto;
+        selectProyecto.required = true;
+    
+        if (centroCosto && this.ccosData.proyectos.has(centroCosto)) {
+            const proyectos = Array.from(this.ccosData.proyectos.get(centroCosto));
+            
+            proyectos.forEach(proyecto => {
+                // Obtener descripción del proyecto
+                const descripcion = this.ccosData.descripcionesProyecto.get(proyecto) || '';
+                const optionText = descripcion ? `${proyecto} - ${descripcion}` : proyecto;
                 
-                // Ordenar proyectos
-                proyectos.sort();
-                
-                proyectos.forEach(proyecto => {
-                    // Obtener descripción del proyecto
-                    const descripcion = this.ccosData.descripcionesProyecto.get(proyecto) || '';
-                    const optionText = descripcion ? `${proyecto} - ${descripcion}` : proyecto;
-                    
-                    selectProyecto.add(new Option(optionText, proyecto));
-                });
-                
-                console.log(`Proyectos actualizados para CC: ${centroCosto}. Se encontraron ${proyectos.length} proyectos.`);
-            } else {
-                console.log(`No se encontraron proyectos para el CC: ${centroCosto}`);
-            }
-        } catch (error) {
-            console.error("Error al actualizar proyectos:", error);
+                selectProyecto.add(new Option(optionText, proyecto));
+            });
         }
     }
 
@@ -493,7 +622,6 @@ class GoogleSheetsDatabase {
             select.appendChild(option);
         });
         
-        console.log(`Select ${elementId} poblado con ${data.length} opciones`);
     }
 
     /**
@@ -549,9 +677,9 @@ class GoogleSheetsDatabase {
                     
                     option.addEventListener('click', () => {
                         if (elementId === 'ruc') {
-                            searchInput.value = item.value; // Mostrar solo el RUC
+                            searchInput.value = item.value; // Only show the RUC code
                             
-                            // NUEVO: Autocompletar el campo de razón social
+                            // Auto-populate company name if available
                             if (item.label && item.label.includes(' - ')) {
                                 const parts = item.label.split(' - ');
                                 if (parts.length >= 2) {
@@ -563,10 +691,10 @@ class GoogleSheetsDatabase {
                                 }
                             }
                         } else {
-                            searchInput.value = item.label || item.value; // Para otros campos, mostrar la etiqueta completa
+                            searchInput.value = item.label; // For other fields, show the full label with description
                         }
                         
-                        hiddenInput.value = item.value; // Siempre guardamos solo el código en el input hidden
+                        hiddenInput.value = item.value; // Always save only the code in the hidden input
                         isValid = true;
                         optionsContainer.classList.remove('active');
                     });
@@ -710,8 +838,6 @@ class GoogleSheetsDatabase {
                     return false;
                 }
                 
-                // Si llegamos aquí, todo está validado correctamente
-                console.log('Todas las validaciones pasaron, ejecutando acción...');
                 
                 // Ejecutar la acción correspondiente
                 switch(btnId) {
@@ -750,9 +876,7 @@ window.googleSheetsDb = new GoogleSheetsDatabase();
 
 // Mensaje cuando el DOM está completamente cargado
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('DOM cargado, verificando instancia de GoogleSheetsDb...');
     if (window.googleSheetsDb) {
-        console.log('GoogleSheetsDb instanciado correctamente');
     } else {
         console.error('ERROR: GoogleSheetsDb NO instanciado');
     }

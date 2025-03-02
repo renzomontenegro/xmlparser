@@ -8,9 +8,6 @@ class InvoiceParser {
         
         // Determinar qué proveedor de base de datos usar
         this.dbProvider = window.googleSheetsDb;
-        if (!this.dbProvider) {
-            console.error('No se encontró un proveedor de base de datos válido');
-        }
         
         this.initializeEventListeners();
         this.initializeComprobanteFormat();
@@ -458,18 +455,11 @@ class InvoiceParser {
             <td>${rowIndex}</td>
             <td><input type="number" step="0.01" class="item-importe" value="${itemData?.importe || ''}" placeholder="Monto sin IGV"></td>
             <td><input type="number" step="0.01" class="item-porcentaje" value="${itemData?.porcentaje || ''}" placeholder="%"></td>
-            <td><input type="text" class="item-lineaNegocio" value="${itemData?.lineaNegocio || ''}"></td>
-            <td><input type="text" class="item-centroCosto" value="${itemData?.centroCosto || ''}"></td>
-            <td><input type="text" class="item-proyecto" value="${itemData?.proyecto || ''}"></td>
+            <td></td>
+            <td></td>
+            <td></td>
             <td><button type="button" class="remove-btn" onclick="window.invoiceParser.removeItem(this)">Eliminar</button></td>
         `;
-        
-        // Usar el proveedor de base de datos detectado (googleSheetsDb o excelDb)
-        if (this.dbProvider) {
-            this.dbProvider.createSelectsForRow(newRow);
-        } else {
-            console.error('No se encontró un proveedor de base de datos válido para createSelectsForRow');
-        }
         
         // Insertar la nueva fila antes de la fila de totales si existe
         const totalRow = document.getElementById('totalRow');
@@ -479,6 +469,13 @@ class InvoiceParser {
             tbody.appendChild(newRow);
         }
     
+        // Usar el proveedor de base de datos detectado (googleSheetsDb)
+        if (window.googleSheetsDb) {
+            window.googleSheetsDb.createSelectsForRow(newRow);
+        } else {
+            console.error('No se encontró un proveedor de base de datos válido para createSelectsForRow');
+        }
+        
         // Agregar eventos a los campos
         const importeInput = newRow.querySelector('.item-importe');
         const porcentajeInput = newRow.querySelector('.item-porcentaje');
@@ -510,7 +507,7 @@ class InvoiceParser {
             this.updateTotalsAndReferences();
         });
         
-        // NUEVO: Añadir evento de cambio para el selector de proyecto
+        // Añadir evento de cambio para el selector de proyecto
         const proyectoSelect = newRow.querySelector('.item-proyecto');
         if (proyectoSelect) {
             proyectoSelect.addEventListener('change', () => {
