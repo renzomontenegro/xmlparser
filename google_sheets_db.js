@@ -110,6 +110,9 @@ class GoogleSheetsDatabase {
     /**
      * Prepara los datos de Centros de Costo para selección dinámica
      */
+
+    // Encuentra la función prepareCCOsData en google_sheets_db.js y actualízala añadiendo
+
     prepareCCOsData() {
         try {
             // Reiniciar estructura de datos
@@ -121,7 +124,7 @@ class GoogleSheetsDatabase {
                 ccosAntiguos: new Map(),
                 descripcionesProyecto: new Map()
             };
-    
+
             const ccosData = this.dataCache['CCOs'] || [];
             
             // Imprimir algunos registros para ver su estructura
@@ -148,18 +151,20 @@ class GoogleSheetsDatabase {
                     }
                 }
             });
-    
+
             // Segunda pasada: procesar centros de costo y proyectos
             ccosData.forEach(item => {
                 const lineaNegocio = item.extra1 || '';
                 const centroCosto = item.extra2 || '';
                 const proyecto = item.extra3 || '';
                 const ccoAntiguo = item.extra4 || ''; 
+                // Aquí obtenemos el valor de Observaciones (extra5 normalmente corresponde a la columna G)
+                const observaciones = item.extra5 || '';
                 
                 // Extraer descripción del centro de costo
                 const descripcion = item.label ? (item.label.includes(' - ') ? 
                     item.label.split(' - ')[1].trim() : item.label) : '';
-    
+
                 // Procesar si hay línea de negocio y centro de costo
                 if (lineaNegocio && centroCosto) {
                     if (!this.ccosData.centrosCosto.has(lineaNegocio)) {
@@ -178,12 +183,22 @@ class GoogleSheetsDatabase {
                         this.ccosData.ccosAntiguos.set(centroCosto, ccoAntiguo);
                     }
                     
-                    // Procesar proyecto
+                    // Procesar proyecto - MODIFICADO: Verificar si el proyecto no está inhabilitado
                     if (proyecto && proyecto.trim() !== '') {
-                        if (!this.ccosData.proyectos.has(centroCosto)) {
-                            this.ccosData.proyectos.set(centroCosto, new Set());
+                        // Verificar si el proyecto está inhabilitado
+                        const proyectoInhabilitado = 
+                            observaciones.toLowerCase().includes('inhabilitado') || 
+                            observaciones.toLowerCase().includes('inhabilitar');
+                        
+                        // Solo agregar el proyecto si NO está inhabilitado
+                        if (!proyectoInhabilitado) {
+                            if (!this.ccosData.proyectos.has(centroCosto)) {
+                                this.ccosData.proyectos.set(centroCosto, new Set());
+                            }
+                            this.ccosData.proyectos.get(centroCosto).add(proyecto);
+                        } else {
+                            console.log(`Proyecto ${proyecto} inhabilitado: ${observaciones}`);
                         }
-                        this.ccosData.proyectos.get(centroCosto).add(proyecto);
                     }
                 }
             });
