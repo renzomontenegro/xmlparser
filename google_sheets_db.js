@@ -154,6 +154,7 @@ class GoogleSheetsDatabase {
                 const lineaNegocio = item.extra1 || '';
                 const centroCosto = item.extra2 || '';
                 const proyecto = item.extra3 || '';
+                const ccoAntiguo = item.extra4 || ''; 
                 
                 // Extraer descripción del centro de costo
                 const descripcion = item.label ? (item.label.includes(' - ') ? 
@@ -170,6 +171,11 @@ class GoogleSheetsDatabase {
                     // Guardar descripción del centro de costo
                     if (descripcion) {
                         this.ccosData.descripcionesCC.set(centroCosto, descripcion);
+                    }
+
+                    // Guardar centro de costo antiguo si existe
+                    if (ccoAntiguo && ccoAntiguo.trim() !== '') {
+                        this.ccosData.ccosAntiguos.set(centroCosto, ccoAntiguo);
                     }
                     
                     // Procesar proyecto
@@ -264,6 +270,31 @@ class GoogleSheetsDatabase {
             searchCC.className = 'item-centroCosto-search';
             searchCC.placeholder = 'Buscar centro de costo...';
             searchCC.disabled = true;
+
+            // Prevenir caracteres no numéricos en el input
+            searchCC.addEventListener('keypress', (e) => {
+                // Permitir solo números y teclas de control como backspace, delete, etc.
+                if (!/^\d$/.test(e.key) && !e.ctrlKey && !e.metaKey && e.key !== 'Backspace' && e.key !== 'Delete' && e.key !== 'Tab') {
+                    e.preventDefault();
+                }
+            });
+
+            // Limpiar caracteres no numéricos si se pega contenido
+            searchCC.addEventListener('paste', (e) => {
+                // Prevenir la acción predeterminada de pegar
+                e.preventDefault();
+                
+                // Obtener el texto pegado
+                const pastedText = (e.clipboardData || window.clipboardData).getData('text');
+                
+                // Filtrar solo los dígitos
+                const cleanText = pastedText.replace(/\D/g, '');
+                
+                // Insertar el texto limpio en la posición del cursor
+                document.execCommand('insertText', false, cleanText);
+            });
+            // FIN DEL CÓDIGO DE VALIDACIÓN
+
             const hiddenCC = document.createElement('input');
             hiddenCC.type = 'hidden';
             hiddenCC.className = 'item-centroCosto';
@@ -311,9 +342,9 @@ class GoogleSheetsDatabase {
             // Implementar búsqueda de centro de costo
             searchCC.addEventListener('input', () => {
                 const searchTerm = searchCC.value.toLowerCase();
-                const lineaNegocio = selectLN.value; // Obtener lineaNegocio aquí
+                const lineaNegocio = selectLN.value;
                 optionsCC.innerHTML = '';
-    
+            
                 if (lineaNegocio && this.ccosData.centrosCosto.has(lineaNegocio)) {
                     const centrosCosto = Array.from(this.ccosData.centrosCosto.get(lineaNegocio));
                     const filteredCC = centrosCosto.filter(cc => {
@@ -321,22 +352,21 @@ class GoogleSheetsDatabase {
                         const ccLower = (cc || '').toString().toLowerCase();
                         const descripcion = (this.ccosData.descripcionesCC.get(cc) || '').toString().toLowerCase();
                         const ccoAntiguo = (this.ccosData.ccosAntiguos.get(cc) || '').toString().toLowerCase();
-    
+            
                         return ccLower.includes(searchTerm) || 
                             descripcion.includes(searchTerm) ||
-                            ccoAntiguo.includes(searchTerm);
+                            ccoAntiguo.includes(searchTerm); // Buscar también por CC Antiguo
                     });
-    
+            
                     filteredCC.forEach(cc => {
                         const option = document.createElement('div');
                         option.className = 'select-option';
                         
-                        // CAMBIO: Mostrar solo el código del Centro de Costo
+                        // Solo mostrar el código CC sin descripción
                         option.textContent = cc;
                         option.dataset.value = cc;
                         
                         option.addEventListener('click', () => {
-                            // CAMBIO: Solo mostrar el código en el campo de búsqueda
                             searchCC.value = cc;
                             hiddenCC.value = cc;
                             optionsCC.style.display = 'none';
