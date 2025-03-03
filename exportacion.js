@@ -161,7 +161,7 @@ class ExcelExporter {
         }
     }
 
-    // Localiza esta sección en el método exportERP de la clase ExcelExporter
+    
     async exportERP(options = {}) {
         const form = document.getElementById('invoiceForm');
         if (!form.checkValidity()) {
@@ -190,14 +190,6 @@ class ExcelExporter {
             // Formatear fechas
             const fechaEmisionFormateada = formatDate(formData.basic.fechaEmision);
             
-            // Obtener fecha actual formateada
-            const today = new Date();
-            const formattedToday = today.toLocaleDateString('es-PE', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric'
-            });
-
             // Extraer número de factura y construir descripción
             const facturaNum = formData.basic.numeroComprobante.split('-')[1] || '';
             const baseDescription = `${formData.basic.razonSocial} ${formData.basic.descripcion}`;
@@ -216,6 +208,23 @@ class ExcelExporter {
                     }
                 }
             }
+            
+            // Obtener el tipo de moneda para usarlo como sitio proveedor
+            const tipoMoneda = document.getElementById('tipoMoneda').value;
+            
+            // Obtener el tipo de factura (solo el código)
+            const tipoFacturaCompleto = document.getElementById('tipoFactura').value;
+            const tipoFacturaCodigo = tipoFacturaCompleto.split(' - ')[0].trim();
+            
+            // Verificar si hay detracción seleccionada
+            const codigoDetraccion = (document.getElementById('codigoBien').value.split(' - ')[0] || '').padStart(3, '0');
+            const porcentajeDetraccion = document.getElementById('porcentajeDetraccion').value;
+            const tieneDetraccion = codigoDetraccion !== '000' && porcentajeDetraccion !== '';
+            
+            // Formatear Información Adicional correctamente
+            const codigoDetraccionFormato = codigoDetraccion || '.';
+            const codigoTipoDetraccion = tieneDetraccion ? '01' : '.';
+            const infoAdicional = `...${tipoFacturaCodigo || '.'}....5.${codigoTipoDetraccion}.${codigoDetraccionFormato}.......`;
 
             // Procesar items normales y otros cargos
             let allItems = [...formData.items];
@@ -234,34 +243,32 @@ class ExcelExporter {
                 sheet.cell(`J${rowNum}`).value(parseFloat(formData.basic.importe));
                 sheet.cell(`K${rowNum}`).value(fechaEmisionFormateada);
                 sheet.cell(`L${rowNum}`).value(formData.basic.razonSocial);
-                sheet.cell(`M${rowNum}`).value(formData.basic.ruc);
-                sheet.cell(`N${rowNum}`).value(numeroOracle); // Colocar el número Oracle en la columna N
+                sheet.cell(`M${rowNum}`).value(numeroOracle); // Colocar el número Oracle en la columna M
+                sheet.cell(`N${rowNum}`).value(tipoMoneda); // Colocar el tipo de moneda en la columna N (sitio proveedor)
                 sheet.cell(`O${rowNum}`).value('');
                 sheet.cell(`P${rowNum}`).value('Estándar');
                 sheet.cell(`Q${rowNum}`).value(baseDescription);
                 
-                // Fechas actuales
-                sheet.cell(`W${rowNum}`).value(formattedToday);
-                sheet.cell(`X${rowNum}`).value(formattedToday);
+                // Usar fecha de emisión para fechas contables y de presupuesto
+                sheet.cell(`W${rowNum}`).value(fechaEmisionFormateada);
+                sheet.cell(`X${rowNum}`).value(fechaEmisionFormateada);
                 
                 sheet.cell(`AG${rowNum}`).value('TC Venta');
                 sheet.cell(`AH${rowNum}`).value(fechaEmisionFormateada);
                 
                 sheet.cell(`BW${rowNum}`).value('Peru');
-                sheet.cell(`BX${rowNum}`).value('');
+                sheet.cell(`BX${rowNum}`).value(infoAdicional);
                 
                 sheet.cell(`CA${rowNum}`).value(index + 1);
                 sheet.cell(`CB${rowNum}`).value('Ítem');
                 sheet.cell(`CC${rowNum}`).value(parseFloat(item.importe));
                 sheet.cell(`CG${rowNum}`).value(baseDescription);
-                sheet.cell(`CS${rowNum}`).value('');
-
-                // Obtener el código de detracción y asegurar valor por defecto
-                const codigoDetraccion = (document.getElementById('codigoBien').value.split(' - ')[0] || '').padStart(3, '0');
                 
-                // Formatear Información Adicional - usar puntos si faltan valores
-                const infoAdicional = `...01....5.01.${codigoDetraccion || '.'}.......`;
-
+                // Colocar código del porcentaje de detracción en columna DJ
+                // Extraer solo el código del porcentaje de detracción (parte antes del guion)
+                const porcentajeDetraccionCodigo = porcentajeDetraccion.split(' - ')[0] || '';
+                sheet.cell(`DJ${rowNum}`).value(porcentajeDetraccionCodigo);
+                
                 // Obtener valores con fallback a punto
                 const cuentaContable = formData.cuentaContableSearch || '.';
                 const lineaNegocio = item.lineaNegocio || '.';
@@ -270,8 +277,6 @@ class ExcelExporter {
                 
                 // Formatear Combinación de Distribución
                 const combinacionDistribucion = `E1.${cuentaContable}.${lineaNegocio}.${centroCosto}.${proyecto}.U00.00.00`;
-
-                sheet.cell(`BX${rowNum}`).value(infoAdicional);
                 sheet.cell(`CS${rowNum}`).value(combinacionDistribucion);
             });
 
