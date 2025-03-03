@@ -823,10 +823,10 @@ class InvoiceParser {
                 const porcentajeInput = row.querySelector('.item-porcentaje');
                 
                 if (importeInput && porcentajeInput) {
-                    const porcentaje = parseFloat(porcentajeInput.value) || 0;
-                    // Calcula el nuevo importe basado en el porcentaje y la nueva base imponible
-                    const nuevoImporte = baseImponible * (porcentaje / 100);
-                    importeInput.value = nuevoImporte.toFixed(2);
+                    const importe = parseFloat(importeInput.value) || 0;
+                    // Actualizar solo el porcentaje según el importe existente
+                    const nuevoPorcentaje = baseImponible > 0 ? (importe / baseImponible * 100) : 0;
+                    porcentajeInput.value = nuevoPorcentaje.toFixed(2);
                 }
             });
             

@@ -198,8 +198,8 @@ class ExcelExporter {
             const rucValue = formData.basic.ruc;
             
             // Buscar el número Oracle en la lista de proveedores
-            if (window.excelDb && window.excelDb.data && window.excelDb.data.proveedores) {
-                const proveedor = window.excelDb.data.proveedores.find(p => p.value === rucValue);
+            if (window.googleSheetsDb && window.googleSheetsDb.data && window.googleSheetsDb.data.proveedores) {
+                const proveedor = window.googleSheetsDb.data.proveedores.find(p => p.value === rucValue);
                 if (proveedor && proveedor.label) {
                     const parts = proveedor.label.split(' - ');
                     if (parts.length >= 3) {
@@ -455,7 +455,7 @@ class FormStorage {
                     tbody.appendChild(newRow);
     
                     // Crear selects para la nueva fila
-                    window.excelDb.createSelectsForRow(newRow);
+                    window.googleSheetsDb.createSelectsForRow(newRow);
     
                     // Establecer valores en los selectores customizados
                     setTimeout(() => {
@@ -476,12 +476,12 @@ class FormStorage {
                                 const proyectoSelect = newRow.querySelector('.item-proyecto');
                                 if (proyectoSelect && item.proyecto) {
                                     proyectoSelect.disabled = false;
-                                    if (window.excelDb.ccosData.proyectos.has(item.centroCosto)) {
+                                    if (window.googleSheetsDb.ccosData.proyectos.has(item.centroCosto)) {
                                         // Obtener proyectos y sus descripciones
-                                        const proyectos = Array.from(window.excelDb.ccosData.proyectos.get(item.centroCosto));
+                                        const proyectos = Array.from(window.googleSheetsDb.ccosData.proyectos.get(item.centroCosto));
                                         proyectoSelect.innerHTML = '<option value="00000000000">00000000000</option>';
                                         proyectos.forEach(proyecto => {
-                                            const descripcion = window.excelDb.ccosData.descripcionesProyecto.get(proyecto) || '';
+                                            const descripcion = window.googleSheetsDb.ccosData.descripcionesProyecto.get(proyecto) || '';
                                             const optionText = descripcion ? `${proyecto} - ${descripcion}` : proyecto;
                                             proyectoSelect.add(new Option(optionText, proyecto));
                                         });
