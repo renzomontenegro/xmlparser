@@ -511,7 +511,6 @@ class InvoiceParser {
         const proyectoSelect = newRow.querySelector('.item-proyecto');
         if (proyectoSelect) {
             proyectoSelect.addEventListener('change', () => {
-                console.log(`Proyecto cambiado a: ${proyectoSelect.value}`);
                 // Actualizar otros cargos cuando cambia el proyecto
                 this.handleOtrosCargosChange();
             });
