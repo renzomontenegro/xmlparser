@@ -427,9 +427,6 @@ class InvoiceParser {
             document.getElementById('numeroComprobante').value = data.numeroComprobante;
         }
 
-        // Agregar un item inicial
-        this.addNewItem();
-
         // Actualizar los totales
         this.updateTotalsAndReferences();
     }
@@ -479,16 +476,12 @@ class InvoiceParser {
         const importeInput = newRow.querySelector('.item-importe');
         const porcentajeInput = newRow.querySelector('.item-porcentaje');
     
-        // Establecer valores iniciales si no se proporcionaron datos
-        if (!itemData) {
-            // Si no hay datos proporcionados y hay base imponible, establecer valores predeterminados
-            if (baseImponible > 0) {
-                // Si es el primer item, establecer 100%, de lo contrario 0%
-                const defaultPorcentaje = itemRows.length === 0 ? 100 : 0;
-                porcentajeInput.value = defaultPorcentaje;
-                importeInput.value = ((baseImponible * defaultPorcentaje) / 100).toFixed(2);
-            }
+        // Establecer valores iniciales solo si se proporcionaron datos
+        if (itemData) {
+            porcentajeInput.value = itemData.porcentaje || '';
+            importeInput.value = itemData.importe || '';
         }
+        // Eliminamos el código que asigna 100% al primer item
         
         // Añadir un evento para que al menos actualice los totales cuando cambia el porcentaje
         porcentajeInput.addEventListener('input', () => {
