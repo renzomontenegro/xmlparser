@@ -7,6 +7,16 @@ class ExportAllManager {
         document.getElementById('downloadAllBtn').addEventListener('click', () => this.downloadAll());
     }
 
+    // Función para formatear la fecha como DD-MM-YYYY
+    formatDateForFilename() {
+        const date = new Date();
+        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const year = date.getFullYear();
+        
+        return `${day}-${month}-${year}`;
+    }
+
     async downloadAll() {
         // Validar el formulario antes de proceder
         const form = document.getElementById('invoiceForm');
@@ -17,7 +27,7 @@ class ExportAllManager {
 
         try {
             const zip = new JSZip();
-            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            const timestamp = this.formatDateForFilename();
 
             // Asegurarnos que los datos estén actualizados antes de la exportación
             window.invoiceParser.updateTotalsAndReferences();
