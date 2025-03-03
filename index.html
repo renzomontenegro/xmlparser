@@ -28,7 +28,16 @@
 
         <form id="invoiceForm">
             <div class="form-grid">
-                <!-- Sección 1: Información básica -->
+
+                <div class="form-group">
+                    <label for="tipoFacturaNacionalidad">Tipo de Factura</label>
+                    <select id="tipoFacturaNacionalidad" name="tipoFacturaNacionalidad" required>
+                        <option value="">Seleccione...</option>
+                        <option value="nacional" selected>Factura Nacional</option>
+                        <option value="extranjera">Factura Extranjera</option>
+                    </select>
+                </div>
+
                 <div class="form-group">
                     <label for="ruc">RUC</label>
                     <div class="custom-select-container">
@@ -52,6 +61,16 @@
                         <option value="PEN">PEN</option>
                     </select>
                 </div>
+                
+                <div class="form-group">
+                    <label for="tipoMoneda">Tipo de Moneda</label>
+                    <select id="tipoMoneda" name="tipoMoneda" required>
+                        <option value="">Seleccione...</option>
+                        <option value="SOLES-NACIONAL">SOLES-NACIONAL</option>
+                        <option value="DOLARES-NACIONAL">DOLARES-NACIONAL</option>
+                        <option value="DOLARES-EXTERIOR">DOLARES-EXTERIOR</option>
+                    </select>
+                </div>
 
                 <!-- Sección 2: Fechas y números -->
                 <div class="form-group">
@@ -70,7 +89,7 @@
                         <input type="hidden" id="numeroComprobante" name="numeroComprobante">
                     </div>
                     <small class="form-text text-muted">
-                        Formato: XXXX-00000000 (ejemplo: F001-00000123)
+                        Formato Nacional: XXXX-00000000 (ejemplo: F001-00000123)
                     </small>
                 </div>
 
@@ -81,14 +100,8 @@
                     <small class="form-text text-muted">(Importe con IGV)</small>
                 </div>
                 -->
-                <div class="form-group">
-                    <label for="porcentajeDetraccion">Porcentaje detracción</label>
-                    <select id="porcentajeDetraccion" name="porcentajeDetraccion">
-                        <option value="">Seleccione...</option>
-                    </select>
-                </div>
 
-                <!-- Sección 4: Información adicional -->
+                
                 <div class="form-group">
                     <label for="solicitante">Solicitante</label>
                     <input type="text" id="solicitante" name="solicitante" required>
@@ -97,6 +110,13 @@
                 <div class="form-group">
                     <label for="areaSolicitante">Área Solicitante</label>
                     <input type="text" id="areaSolicitante" name="areaSolicitante" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="porcentajeDetraccion">Porcentaje detracción</label>
+                    <select id="porcentajeDetraccion" name="porcentajeDetraccion">
+                        <option value="">Seleccione...</option>
+                    </select>
                 </div>
 
                 <div class="form-group">
@@ -245,6 +265,7 @@
     <script src="xml_parser.js"></script>
     <script src="exportacion.js"></script>
     <script src="google_sheets_db.js"></script>
-    <script src="export_all.js"></script>  
+    <script src="export_all.js"></script>
+    <script src="factura_nacionalidad.js"></script>
 </body>
 </html>

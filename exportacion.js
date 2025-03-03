@@ -50,7 +50,9 @@ class ExcelExporter {
             const basicInfo = [
                 { label: 'RUC:', value: formData.basic.ruc },
                 { label: 'Razón Social:', value: formData.basic.razonSocial },
+                { label: 'Tipo de Factura:', value: formData.basic.tipoFacturaNacionalidad === 'nacional' ? 'Nacional' : 'Extranjera' },
                 { label: 'Moneda:', value: formData.basic.moneda },
+                { label: 'Tipo de Moneda:', value: formData.basic.tipoMoneda },
                 { label: 'Fecha Emisión:', value: formData.basic.fechaEmision },
                 { label: 'N° Comprobante:', value: formData.basic.numeroComprobante },
                 { label: 'Importe Total (Con IGV):', value: formData.basic.importe },
@@ -121,22 +123,27 @@ class ExcelExporter {
             setBold(setRight(sheet.cell('C' + currentRow))).value(sumPorcentaje.toFixed(2) + '%');
             
             currentRow += 2;
-            const importeTotal = parseFloat(document.getElementById('importe').value) || 0;
-            const importeSinIGV = importeTotal / 1.18;
-    
-            setBold(sheet.cell('A' + currentRow)).value('Importe SIN IGV (-18%):');
-            setRight(sheet.cell('B' + currentRow)).value(importeSinIGV.toFixed(2));
-            currentRow++;
-    
-            setBold(sheet.cell('A' + currentRow)).value('Importe CON IGV:');
-            setRight(sheet.cell('B' + currentRow)).value(importeTotal.toFixed(2));
 
-            // Agregar otros cargos si existen
-            if (formData.otrosCargos) {
-                currentRow++;
+            // Obtener los valores directamente del desglose
+            const baseImponible = parseFloat(document.getElementById('baseImponible').value) || 0;
+            const otrosCargos = parseFloat(document.getElementById('otrosCargos').value) || 0;
+            const importeTotal = parseFloat(document.getElementById('importe').value) || 0;
+
+            // Base Imponible
+            setBold(sheet.cell('A' + currentRow)).value('Base Imponible:');
+            setRight(sheet.cell('B' + currentRow)).value(baseImponible.toFixed(2));
+            currentRow++;
+
+            // Otros Cargos (solo si es mayor que cero)
+            if (otrosCargos > 0) {
                 setBold(sheet.cell('A' + currentRow)).value('Otros Cargos:');
-                setRight(sheet.cell('B' + currentRow)).value(parseFloat(formData.otrosCargos.monto).toFixed(2));
+                setRight(sheet.cell('B' + currentRow)).value(otrosCargos.toFixed(2));
+                currentRow++;
             }
+
+            // Importe Total
+            setBold(sheet.cell('A' + currentRow)).value('Importe Total:');
+            setRight(sheet.cell('B' + currentRow)).value(importeTotal.toFixed(2));
     
             const blob = await workbook.outputAsync();
             
@@ -348,7 +355,9 @@ class FormStorage {
                 'numeroComprobanteParte1',
                 'numeroComprobanteParte2',
                 'cuentaContableSearch',
-                'tipoFactura'
+                'tipoFactura',
+                'tipoFacturaNacionalidad',
+                'tipoMoneda'
             ];
 
             additionalFields.forEach(fieldId => {
@@ -505,6 +514,28 @@ class FormStorage {
                         importeInput.addEventListener('change', () => window.invoiceParser.updateTotalsAndReferences());
                         porcentajeInput.addEventListener('change', () => window.invoiceParser.updateTotalsAndReferences());
                     }
+
+                    if (formData.tipoFacturaNacionalidad) {
+                        document.getElementById('tipoFacturaNacionalidad').value = formData.tipoFacturaNacionalidad;
+                        // Disparar el evento para que se actualice la lógica
+                        const event = new Event('change');
+                        document.getElementById('tipoFacturaNacionalidad').dispatchEvent(event);
+                    }
+                    
+                    if (formData.tipoMoneda) {
+                        document.getElementById('tipoMoneda').value = formData.tipoMoneda;
+                        // Disparar el evento para que se actualice la lógica
+                        const event = new Event('change');
+                        document.getElementById('tipoMoneda').dispatchEvent(event);
+                    }
+
+                    setTimeout(() => {
+                        // Asegurar que la lógica de tipo de factura y moneda esté actualizada
+                        if (window.handleTipoFacturaNacionalidadChange) {
+                            window.handleTipoFacturaNacionalidadChange();
+                        }
+                    }, 500);
+
                 });
             }
     

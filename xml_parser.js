@@ -268,6 +268,8 @@ class InvoiceParser {
                 ruc: this.getElementValue(xmlDoc, "ID", xmlDoc.querySelector("*|AccountingSupplierParty")),
                 razonSocial: this.getElementValue(xmlDoc, "RegistrationName"),
                 moneda: this.standardizeCurrency(this.getElementValue(xmlDoc, "DocumentCurrencyCode")),
+                tipoFacturaNacionalidad: 'nacional',
+                tipoMoneda: '',
                 fechaEmision: this.getElementValue(xmlDoc, "IssueDate"),
                 numeroComprobanteParte1: parte1,
                 numeroComprobanteParte2: parte2,
@@ -283,15 +285,12 @@ class InvoiceParser {
                 items: []
             };
 
-            // Intentar obtener descripción del primer item
-            const invoiceLines = this.getElements(xmlDoc, "InvoiceLine");
-            if (invoiceLines.length > 0) {
-                const firstLine = invoiceLines[0];
-                const description = this.getElementValue(firstLine, "Description");
-                if (description) {
-                    result.descripcion = description;
-                }
+            if (result.moneda === 'PEN') {
+                result.tipoMoneda = 'SOLES-NACIONAL';
+            } else if (result.moneda === 'USD') {
+                result.tipoMoneda = 'DOLARES-NACIONAL'; // Asumimos nacional por defecto
             }
+
 
             return result;
 
@@ -659,7 +658,7 @@ class InvoiceParser {
         // Lista de campos básicos a recolectar
         const basicFields = [
             'ruc', 'razonSocial', 'moneda', 'fechaEmision', 'numeroComprobante',
-            'importe', 'solicitante',
+            'importe', 'solicitante', 'tipoFacturaNacionalidad', 'tipoMoneda',
             'descripcion', 'codigoBien', 'porcentajeDetraccion', 'fechaInicioLicencia',
             'fechaFinLicencia', 'areaSolicitante'
         ];
