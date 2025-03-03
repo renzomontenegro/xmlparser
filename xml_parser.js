@@ -490,12 +490,9 @@ class InvoiceParser {
                 importeInput.value = ((baseImponible * defaultPorcentaje) / 100).toFixed(2);
             }
         }
-    
+        
+        // Añadir un evento para que al menos actualice los totales cuando cambia el porcentaje
         porcentajeInput.addEventListener('input', () => {
-            const porcentaje = parseFloat(porcentajeInput.value) || 0;
-            // Usar base imponible en lugar de importeSinIGV
-            const nuevoImporte = (baseImponible * porcentaje / 100);
-            importeInput.value = nuevoImporte.toFixed(2);
             this.updateTotalsAndReferences();
         });
     
@@ -851,14 +848,18 @@ class InvoiceParser {
         
             this.clearItems(); // Limpiar items existentes
             
-            // Obtener la base imponible actual directamente
+            // Obtener la base imponible actual
             const baseImponible = parseFloat(document.getElementById('baseImponible').value) || 0;
+            
+            // Calcular importe por ítem dividiendo la base imponible
+            const importePorItem = baseImponible / cantidadItems;
+            
+            // Calcular el porcentaje correspondiente a cada ítem
             const porcentajePorItem = 100 / cantidadItems;
-            const importePorItem = (baseImponible * porcentajePorItem / 100).toFixed(2);
-        
+            
             for (let i = 0; i < cantidadItems; i++) {
                 this.addNewItem({
-                    importe: importePorItem,
+                    importe: importePorItem.toFixed(2),
                     porcentaje: porcentajePorItem.toFixed(2)
                 });
             }
