@@ -293,7 +293,34 @@ class GoogleSheetsDatabase {
                 // Insertar el texto limpio en la posición del cursor
                 document.execCommand('insertText', false, cleanText);
             });
-            // FIN DEL CÓDIGO DE VALIDACIÓN
+            
+            searchCC.addEventListener('blur', () => {
+                // Si el campo está deshabilitado, no validar
+                if (searchCC.disabled) return;
+                
+                const currentValue = searchCC.value.trim();
+                
+                // Si el campo está vacío, solo limpiar el hidden
+                if (currentValue === '') {
+                    hiddenCC.value = '';
+                    return;
+                }
+                
+                // Verificar si el valor actual corresponde a un centro de costo válido
+                const lineaNegocio = selectLN.value;
+                let isValid = false;
+                
+                if (lineaNegocio && this.ccosData.centrosCosto.has(lineaNegocio)) {
+                    const centrosCosto = Array.from(this.ccosData.centrosCosto.get(lineaNegocio));
+                    isValid = centrosCosto.includes(currentValue);
+                }
+                
+                // Si no es válido, limpiar el campo
+                if (!isValid) {
+                    searchCC.value = '';
+                    hiddenCC.value = '';
+                }
+            });
 
             const hiddenCC = document.createElement('input');
             hiddenCC.type = 'hidden';
@@ -344,6 +371,10 @@ class GoogleSheetsDatabase {
                 const searchTerm = searchCC.value.toLowerCase();
                 const lineaNegocio = selectLN.value;
                 optionsCC.innerHTML = '';
+
+                if (searchTerm) {
+                    searchCC.classList.remove('invalid-input');
+                }
             
                 if (lineaNegocio && this.ccosData.centrosCosto.has(lineaNegocio)) {
                     const centrosCosto = Array.from(this.ccosData.centrosCosto.get(lineaNegocio));
@@ -369,6 +400,7 @@ class GoogleSheetsDatabase {
                         option.addEventListener('click', () => {
                             searchCC.value = cc;
                             hiddenCC.value = cc;
+                            searchCC.classList.remove('invalid-input');
                             optionsCC.style.display = 'none';
                             this.updateProyectos(selectProyecto, cc);
                         });
@@ -475,7 +507,7 @@ class GoogleSheetsDatabase {
             
             // Configurar evento de selección
             option.addEventListener('click', () => {
-                // Usar solo el código en el campo de búsqueda visible
+                searchCC.classList.remove('invalid-input');
                 searchCC.value = cc;
                 hiddenCC.value = cc;
                 optionsCC.style.display = 'none';
@@ -831,6 +863,16 @@ class GoogleSheetsDatabase {
      * Validar campos de búsqueda antes de exportar
      */
     validateSearchableFields() {
+        // Añade estos estilos CSS al principio de tu archivo para el borde rojo
+        const style = document.createElement('style');
+        style.textContent = `
+            .invalid-input {
+                border: 2px solid #ff3333 !important;
+                box-shadow: 0 0 5px rgba(255, 51, 51, 0.5) !important;
+            }
+        `;
+        document.head.appendChild(style);
+    
         // Botones que requieren validación
         const buttons = ['exportSolicitudBtn', 'exportERPBtn', 'downloadAllBtn', 'saveFormBtn'];
         
@@ -858,26 +900,58 @@ class GoogleSheetsDatabase {
                     return false;
                 }
                 
+                let isValid = true;
+                
                 // Validar campo RUC con verificación explícita
                 const rucValue = document.getElementById('ruc').value;
-                const rucSearch = document.getElementById('rucSearch').value;
+                const rucSearch = document.getElementById('rucSearch');
                 
                 if (!rucValue || rucValue.trim() === '') {
                     alert('Debe seleccionar un proveedor válido de la lista');
-                    document.getElementById('rucSearch').focus();
-                    return false;
+                    rucSearch.classList.add('invalid-input');
+                    rucSearch.focus();
+                    isValid = false;
+                } else {
+                    rucSearch.classList.remove('invalid-input');
                 }
                 
                 // Validar cuenta contable con verificación explícita
                 const cuentaValue = document.getElementById('cuentaContable').value;
-                const cuentaSearch = document.getElementById('cuentaContableSearch').value;
+                const cuentaSearch = document.getElementById('cuentaContableSearch');
                 
                 if (!cuentaValue || cuentaValue.trim() === '') {
                     alert('Debe seleccionar una cuenta contable válida de la lista');
-                    document.getElementById('cuentaContableSearch').focus();
-                    return false;
+                    cuentaSearch.classList.add('invalid-input');
+                    cuentaSearch.focus();
+                    isValid = false;
+                } else {
+                    cuentaSearch.classList.remove('invalid-input');
                 }
                 
+                // NUEVO: Validar centros de costo para todos los items
+                const ccInputs = document.querySelectorAll('.item-centroCosto-search:not(:disabled)');
+                const ccHiddenInputs = document.querySelectorAll('.item-centroCosto');
+                
+                ccInputs.forEach((input, index) => {
+                    const hiddenValue = ccHiddenInputs[index] ? ccHiddenInputs[index].value : '';
+                    
+                    // Si el input está vacío o el valor no corresponde a un CC válido
+                    if (!hiddenValue || hiddenValue.trim() === '') {
+                        input.classList.add('invalid-input');
+                        if (isValid) { // Solo focus en el primer campo inválido
+                            input.focus();
+                            alert('Todos los campos de Centro de Costo deben tener valores válidos de la lista');
+                        }
+                        isValid = false;
+                    } else {
+                        input.classList.remove('invalid-input');
+                    }
+                });
+                
+                // Si no es válido, detener la ejecución
+                if (!isValid) {
+                    return false;
+                }
                 
                 // Ejecutar la acción correspondiente
                 switch(btnId) {
