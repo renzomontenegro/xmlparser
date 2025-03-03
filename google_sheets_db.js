@@ -768,6 +768,7 @@ class GoogleSheetsDatabase {
                         
                         hiddenInput.value = item.value; // Always save only the code in the hidden input
                         isValid = true;
+                        searchInput.classList.remove('invalid-input');
                         optionsContainer.classList.remove('active');
                     });
                     
@@ -928,7 +929,7 @@ class GoogleSheetsDatabase {
                     cuentaSearch.classList.remove('invalid-input');
                 }
                 
-                // NUEVO: Validar centros de costo para todos los items
+                
                 const ccInputs = document.querySelectorAll('.item-centroCosto-search:not(:disabled)');
                 const ccHiddenInputs = document.querySelectorAll('.item-centroCosto');
                 
