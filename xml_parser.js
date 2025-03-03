@@ -679,6 +679,7 @@ class InvoiceParser {
         // Añadir campos de desglose
         formData.baseImponible = document.getElementById('baseImponible').value || '';
         formData.igv = document.getElementById('igv').value || '';
+        formData.igvPorcentaje = document.getElementById('igvPorcentaje').value || '18';
 
         // Recolectar solo las filas de items (excluyendo las filas de totales y referencias)
         const tbody = document.getElementById('itemsTableBody');
@@ -736,83 +737,95 @@ class InvoiceParser {
         return formData;
     }
 
-        initializeDesgloseFactura() {
-            const baseImponibleInput = document.getElementById('baseImponible');
-            const igvInput = document.getElementById('igv');
-            const otrosCargosInput = document.getElementById('otrosCargos');
-            const totalSumaSpan = document.getElementById('totalSuma');
-            const importeInput = document.getElementById('importe');
-            const validacionTotal = document.getElementById('validacionTotal');
-            const recalcularBtn = document.getElementById('recalcularBtn');
+    initializeDesgloseFactura() {
+        const baseImponibleInput = document.getElementById('baseImponible');
+        const igvInput = document.getElementById('igv');
+        const igvPorcentajeSelect = document.getElementById('igvPorcentaje');
+        const otrosCargosInput = document.getElementById('otrosCargos');
+        const totalSumaSpan = document.getElementById('totalSuma');
+        const importeInput = document.getElementById('importe');
+        const validacionTotal = document.getElementById('validacionTotal');
+        const recalcularBtn = document.getElementById('recalcularBtn');
+    
+        // Función para calcular totales
+        const calcularTotales = () => {
+            const baseImponible = parseFloat(baseImponibleInput.value) || 0;
+            // Modificar esta línea para manejar correctamente el 0%
+            const igvPorcentaje = parseFloat(igvPorcentajeSelect.value);
+            // El resto sigue igual
+            const igv = parseFloat(igvInput.value) || 0;
+            const otrosCargos = parseFloat(otrosCargosInput.value) || 0;
+            
+            // Calcular suma total
+            const suma = baseImponible + igv + otrosCargos;
+            totalSumaSpan.textContent = suma.toFixed(2);
+            
+            // Validar si coincide con el total factura
+            const totalFactura = parseFloat(importeInput.value) || 0;
+            
+            if (Math.abs(suma - totalFactura) < 0.01) {
+                validacionTotal.textContent = "✓ Los totales coinciden correctamente";
+                validacionTotal.className = "validacion-mensaje validacion-success";
+            } else {
+                validacionTotal.textContent = "⚠ Los totales no coinciden. Debe ajustar los valores.";
+                validacionTotal.className = "validacion-mensaje validacion-error";
+            }
+            
+            // Actualizar la tabla de referencia
+            this.updateTotalsAndReferences();
+        };
         
-            // Función para calcular totales
-            const calcularTotales = () => {
-                const baseImponible = parseFloat(baseImponibleInput.value) || 0;
-                const igv = parseFloat(igvInput.value) || 0;
-                const otrosCargos = parseFloat(otrosCargosInput.value) || 0;
-                
-                // Calcular suma total
-                const suma = baseImponible + igv + otrosCargos;
-                totalSumaSpan.textContent = suma.toFixed(2);
-                
-                // Validar si coincide con el total factura
-                const totalFactura = parseFloat(importeInput.value) || 0;
-                
-                if (Math.abs(suma - totalFactura) < 0.01) { // Tolerancia para problemas de redondeo
-                    validacionTotal.textContent = "✓ Los totales coinciden correctamente";
-                    validacionTotal.className = "validacion-mensaje validacion-success";
-                } else {
-                    validacionTotal.textContent = "⚠ Los totales no coinciden. Debe ajustar los valores.";
-                    validacionTotal.className = "validacion-mensaje validacion-error";
-                }
-                
-                // Actualizar la tabla de referencia
-                this.updateTotalsAndReferences();
-            };
+        // Calcular IGV automáticamente cuando cambia la base imponible o el porcentaje
+        const actualizarIGV = () => {
+            const baseImponible = parseFloat(baseImponibleInput.value) || 0;
+            // Asegurarnos de usar igvPorcentaje como está, sin || fallback
+            const igvPorcentaje = parseFloat(igvPorcentajeSelect.value);
+            // Actualizar el valor del IGV
+            igvInput.value = (baseImponible * igvPorcentaje / 100).toFixed(2);
+            calcularTotales();
             
+            // Actualizar los importes de los items según sus porcentajes
+            this.updateItemImportes(baseImponible);
+        };
+        
+        baseImponibleInput.addEventListener('input', actualizarIGV);
+        igvPorcentajeSelect.addEventListener('change', actualizarIGV);
+        
+        // Recalcular suma cuando cambia cualquier valor
+        igvInput.addEventListener('input', calcularTotales);
+        otrosCargosInput.addEventListener('input', calcularTotales);
+        importeInput.addEventListener('input', calcularTotales);
+        
+        recalcularBtn.addEventListener('click', () => {
+            const totalFactura = parseFloat(importeInput.value) || 0;
+            const otrosCargos = parseFloat(otrosCargosInput.value) || 0;
+            // Corrección aquí también para igvPorcentaje
+            const igvPorcentaje = parseFloat(igvPorcentajeSelect.value);
             
-            // Calcular IGV automáticamente cuando cambia la base imponible
-            baseImponibleInput.addEventListener('input', () => {
-                const baseImponible = parseFloat(baseImponibleInput.value) || 0;
-                igvInput.value = (baseImponible * 0.18).toFixed(2);
-                calcularTotales();
-                
-                // Actualizar los importes de los items según sus porcentajes
-                this.updateItemImportes(baseImponible);
-            });
+            // Si no hay total factura, no podemos calcular
+            if (totalFactura <= 0) {
+                alert('Debe ingresar un Total Factura válido para recalcular');
+                return;
+            }
             
-            // Recalcular suma cuando cambia cualquier valor
-            igvInput.addEventListener('input', calcularTotales);
-            otrosCargosInput.addEventListener('input', calcularTotales);
-            importeInput.addEventListener('input', calcularTotales);
+            // Prevenir división por cero cuando igvPorcentaje es 0
+            const divisor = igvPorcentaje === 0 ? 1 : (1 + igvPorcentaje/100);
+            // Calcular la base imponible necesaria para que cuadre
+            const baseCalculada = (totalFactura - otrosCargos) / divisor;
             
-            recalcularBtn.addEventListener('click', () => {
-                const totalFactura = parseFloat(importeInput.value) || 0;
-                const otrosCargos = parseFloat(otrosCargosInput.value) || 0;
-                
-                // Si no hay total factura, no podemos calcular
-                if (totalFactura <= 0) {
-                    alert('Debe ingresar un Total Factura válido para recalcular');
-                    return;
-                }
-                
-                // Calcular la base imponible necesaria para que cuadre
-                // Base = (Total - OtrosCargos) / 1.18
-                const baseCalculada = (totalFactura - otrosCargos) / 1.18;
-                
-                if (baseCalculada < 0) {
-                    alert('El valor de Otros Cargos es mayor que el Total Factura. Por favor, ajuste los valores.');
-                    return;
-                }
-                
-                baseImponibleInput.value = baseCalculada.toFixed(2);
-                igvInput.value = (baseCalculada * 0.18).toFixed(2);
-                calcularTotales();
-                
-                // Añadir esta línea para actualizar los importes de los items
-                this.updateItemImportes(baseCalculada);
-            });
-        }
+            if (baseCalculada < 0) {
+                alert('El valor de Otros Cargos es mayor que el Total Factura. Por favor, ajuste los valores.');
+                return;
+            }
+            
+            baseImponibleInput.value = baseCalculada.toFixed(2);
+            igvInput.value = (baseCalculada * igvPorcentaje / 100).toFixed(2);
+            calcularTotales();
+            
+            // Añadir esta línea para actualizar los importes de los items
+            this.updateItemImportes(baseCalculada);
+        });
+    }
     
         updateItemImportes(baseImponible) {
             const tbody = document.getElementById('itemsTableBody');

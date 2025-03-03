@@ -44,6 +44,7 @@ class ExcelExporter {
             const porcentajeDetraccionValue = document.getElementById('porcentajeDetraccion').value;
             const cuentaContableValue = document.getElementById('cuentaContableSearch').value.split(' - ')[0];
             const tipoFacturaValue = document.getElementById('tipoFactura').value;
+            const igvPorcentajeValue = document.getElementById('igvPorcentaje').value + '%';
     
             // Datos básicos actualizado con nuevos campos
             const basicInfo = [
@@ -75,7 +76,8 @@ class ExcelExporter {
                 { label: 'Código de Detracción:', value: codDetraccionValue },
                 { label: 'Porcentaje Detracción:', value: porcentajeDetraccionValue },
                 { label: 'Fecha Inicio Licencia:', value: document.getElementById('fechaInicioLicencia').value || 'No aplica' },
-                { label: 'Fecha Fin Licencia:', value: document.getElementById('fechaFinLicencia').value || 'No aplica' }
+                { label: 'Fecha Fin Licencia:', value: document.getElementById('fechaFinLicencia').value || 'No aplica' },
+                { label: 'Porcentaje IGV:', value: igvPorcentajeValue }
             ];
     
             additionalInfo.forEach(info => {
@@ -339,6 +341,7 @@ class FormStorage {
             formData.cuentaContableSearch = cuentaContableValue.split(' - ')[0].trim();
             formData.baseImponible = document.getElementById('baseImponible').value;
             formData.igv = document.getElementById('igv').value;
+            formData.igvPorcentaje = document.getElementById('igvPorcentaje').value;
             
             // Agregar datos adicionales que no están en collectFormData
             const additionalFields = [
@@ -413,7 +416,9 @@ class FormStorage {
             if (formData.igv) {
                 document.getElementById('igv').value = formData.igv;
             }
-            
+            if (formData.igvPorcentaje) {
+                document.getElementById('igvPorcentaje').value = formData.igvPorcentaje;
+            }
             // Manejar otros cargos - primero cargar el valor
             if (formData.otrosCargos && formData.otrosCargos.monto) {
                 document.getElementById('otrosCargos').value = formData.otrosCargos.monto;

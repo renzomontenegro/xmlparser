@@ -149,7 +149,13 @@
                         <div class="desglose-input"><input type="number" id="baseImponible" step="0.01" min="0"></div>
                     </div>
                     <div class="desglose-row">
-                        <div class="desglose-label">IGV (18%):</div>
+                        <div class="desglose-label">IGV: 
+                            <select id="igvPorcentaje" style="width: auto; display: inline-block;">
+                                <option value="18" selected>18%</option>
+                                <option value="10">10%</option>
+                                <option value="0">0%</option>
+                            </select>
+                        </div>
                         <div class="desglose-input"><input type="number" id="igv" step="0.01" min="0"></div>
                     </div>
                     <div class="desglose-row">
