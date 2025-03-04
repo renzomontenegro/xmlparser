@@ -856,19 +856,36 @@ class InvoiceParser {
             // Obtener la base imponible actual
             const baseImponible = parseFloat(document.getElementById('baseImponible').value) || 0;
             
-            // Calcular importe por ítem dividiendo la base imponible
+            // Dividir el importe por ítem equitativamente
             const importePorItem = baseImponible / cantidadItems;
             
-            // Calcular el porcentaje correspondiente a cada ítem
-            const porcentajePorItem = 100 / cantidadItems;
-            
+            // Crear exactamente el número de ítems solicitados
             for (let i = 0; i < cantidadItems; i++) {
-                this.addNewItem({
-                    importe: importePorItem.toFixed(2),
-                    porcentaje: porcentajePorItem.toFixed(2)
+                // Añadir el ítem con el importe calculado
+                const newItem = this.addNewItem({
+                    importe: importePorItem.toFixed(2)
                 });
             }
-        
+            
+            // IMPORTANTE: Actualizar los porcentajes manualmente después de crear los ítems
+            const tbody = document.getElementById('itemsTableBody');
+            const items = tbody.querySelectorAll('tr:not(.total-row):not(#totalRow):not(#importeSinIGVRow):not(#importeConIGVRow)');
+            
+            items.forEach(row => {
+                const importeInput = row.querySelector('.item-importe');
+                const porcentajeInput = row.querySelector('.item-porcentaje');
+                
+                if (importeInput && porcentajeInput) {
+                    const importe = parseFloat(importeInput.value) || 0;
+                    // Calcular el porcentaje basado en el importe y la base imponible
+                    const nuevoPorcentaje = baseImponible > 0 ? (importe / baseImponible * 100) : 0;
+                    porcentajeInput.value = nuevoPorcentaje.toFixed(2);
+                }
+            });
+            
+            // Actualizar totales y referencias después de modificar todos los ítems
+            this.updateTotalsAndReferences();
+            
             // Actualizar otros cargos después de crear los nuevos items
             this.handleOtrosCargosChange();
         }
