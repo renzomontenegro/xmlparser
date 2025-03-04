@@ -15,6 +15,7 @@ class InvoiceParser {
         this.otrosCargosList = []; 
         this.initializeNewFields();
         this.initializeDesgloseFactura();
+        this.initializeDescripcionLimit();
     }
 
     initializeEventListeners() {
@@ -56,6 +57,40 @@ class InvoiceParser {
                 }
             });
         });
+    }
+
+    initializeDescripcionLimit() {
+        const descripcionField = document.getElementById('descripcion');
+        if (descripcionField) {
+            // Establecer límite de 25 caracteres
+            descripcionField.setAttribute('maxlength', '25');
+            
+            // Añadir contador de caracteres
+            const counterSpan = document.createElement('span');
+            counterSpan.className = 'character-counter';
+            counterSpan.style.cssText = 'float: right; font-size: 12px; color: #6c757d; margin-top: 5px;';
+            
+            const updateCounter = () => {
+                const currentLength = descripcionField.value.length;
+                counterSpan.textContent = `${currentLength}/25`;
+                
+                // Cambiar color cuando se acerca al límite
+                if (currentLength >= 20) {
+                    counterSpan.style.color = '#dc3545';
+                } else {
+                    counterSpan.style.color = '#6c757d';
+                }
+            };
+            
+            // Inicializar contador
+            updateCounter();
+            
+            // Añadir el contador después del campo
+            descripcionField.parentNode.appendChild(counterSpan);
+            
+            // Actualizar el contador cuando cambia el contenido
+            descripcionField.addEventListener('input', updateCounter);
+        }
     }
 
     initializeComprobanteFormat() {
