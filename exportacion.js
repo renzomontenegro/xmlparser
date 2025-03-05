@@ -195,7 +195,6 @@ class ExcelExporter {
             // Buscar el número Oracle en la lista de proveedores
             if (window.googleSheetsDb && typeof window.googleSheetsDb.getSheetData === 'function') {
                 const proveedores = window.googleSheetsDb.getSheetData('Proveedores');
-                console.log("Proveedores disponibles:", proveedores);
                 console.log("RUC buscado:", rucValue);
                 
                 if (Array.isArray(proveedores)) {
@@ -240,7 +239,7 @@ class ExcelExporter {
 
                 sheet.cell(`E${rowNum}`).value('1');
                 sheet.cell(`F${rowNum}`).value('UNIVERSIDAD ESAN BU');
-                sheet.cell(`G${rowNum}`).value('EYARASCA');
+                sheet.cell(`G${rowNum}`).value('');
                 sheet.cell(`H${rowNum}`).value(formData.basic.numeroComprobante);
                 sheet.cell(`I${rowNum}`).value(formData.basic.moneda);
                 sheet.cell(`J${rowNum}`).value(parseFloat(formData.basic.importe));
