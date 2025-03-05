@@ -83,9 +83,6 @@ class GoogleSheetsDatabase {
             const data = await response.json();
             const endTime = performance.now();
             
-            console.log(`Hoja ${sheetName} cargada en ${(endTime-startTime)/1000} segundos`);
-            
-            
             // Guardar en caché
             this.dataCache[sheetName] = data[sheetName] || [];
             
@@ -128,7 +125,7 @@ class GoogleSheetsDatabase {
             const ccosData = this.dataCache['CCOs'] || [];
             
             // Imprimir algunos registros para ver su estructura
-            console.log('Muestra de registros CCOs:', ccosData.slice(0, 5));
+            //console.log('Muestra de registros CCOs:', ccosData.slice(0, 5));
             
             // Primera pasada: recopilar todas las líneas de negocio
             ccosData.forEach(item => {
@@ -196,15 +193,10 @@ class GoogleSheetsDatabase {
                                 this.ccosData.proyectos.set(centroCosto, new Set());
                             }
                             this.ccosData.proyectos.get(centroCosto).add(proyecto);
-                        } else {
-                            console.log(`Proyecto ${proyecto} inhabilitado: ${observaciones}`);
                         }
                     }
                 }
             });
-            
-            // Imprimir información de proyectos para diagnóstico
-            console.log('Total de proyectos con descripción:', this.ccosData.descripcionesProyecto.size);
             
         } catch (error) {
             console.error('Error al preparar datos de Centros de Costo:', error);

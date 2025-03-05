@@ -5,7 +5,7 @@ class InvoiceParser {
             'cac': 'urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2',
             'sac': 'urn:sunat:names:specification:ubl:peru:schema:xsd:SunatAggregateComponents-1'
         };
-        
+        this.initializeLoadingScreen();
         // Determinar qué proveedor de base de datos usar
         this.dbProvider = window.googleSheetsDb;
         
@@ -265,6 +265,67 @@ setupRucRazonSocialBehavior() {
         `;
         document.head.appendChild(style);
     }
+}
+
+initializeLoadingScreen() {
+    // Crear el overlay de carga
+    const loadingOverlay = document.createElement('div');
+    loadingOverlay.id = 'loading-overlay';
+    loadingOverlay.innerHTML = `
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Preparando todo para ti...</div>
+    `;
+    
+    // Estilos para el overlay
+    loadingOverlay.style.position = 'fixed';
+    loadingOverlay.style.top = '0';
+    loadingOverlay.style.left = '0';
+    loadingOverlay.style.width = '100%';
+    loadingOverlay.style.height = '100%';
+    loadingOverlay.style.backgroundColor = 'rgba(255, 255, 255, 0.8)';
+    loadingOverlay.style.display = 'flex';
+    loadingOverlay.style.flexDirection = 'column';
+    loadingOverlay.style.justifyContent = 'center';
+    loadingOverlay.style.alignItems = 'center';
+    loadingOverlay.style.zIndex = '9999';
+    loadingOverlay.style.transition = 'opacity 0.5s';
+    
+    // Estilos para el spinner
+    const spinnerStyle = document.createElement('style');
+    spinnerStyle.textContent = `
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 15px;
+        }
+        
+        .loading-text {
+            font-size: 18px;
+            color: #333;
+            font-family: Arial, sans-serif;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    `;
+    
+    // Añadir elementos al DOM
+    document.head.appendChild(spinnerStyle);
+    document.body.appendChild(loadingOverlay);
+    
+    // Ocultar después de 3.5 segundos
+    setTimeout(() => {
+        loadingOverlay.style.opacity = '0';
+        setTimeout(() => {
+            loadingOverlay.style.display = 'none';
+        }, 500); // Tiempo adicional para la transición
+    }, 3000);
 }
 
     initializeEventListeners() {
