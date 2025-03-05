@@ -166,7 +166,7 @@ class ExcelExporter {
         const form = document.getElementById('invoiceForm');
         if (!form.checkValidity()) {
             form.reportValidity();
-            return; // Detener la ejecución si no es válido
+            return; 
         }
 
         try {
@@ -181,12 +181,6 @@ class ExcelExporter {
                 return `${day}/${month}/${year}`;
             };
 
-            const formatDateToSpanish = (dateStr) => {
-                const [year, month, day] = dateStr.split('-');
-                const months = ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC'];
-                return `${parseInt(day)} ${months[parseInt(month) - 1]}`;
-            };
-
             // Formatear fechas
             const fechaEmisionFormateada = formatDate(formData.basic.fechaEmision);
             
@@ -197,17 +191,26 @@ class ExcelExporter {
             // Obtener el número Oracle del proveedor
             let numeroOracle = '';
             const rucValue = formData.basic.ruc;
-            
+
             // Buscar el número Oracle en la lista de proveedores
-            if (window.googleSheetsDb && window.googleSheetsDb.data && window.googleSheetsDb.data.proveedores) {
-                const proveedor = window.googleSheetsDb.data.proveedores.find(p => p.value === rucValue);
-                if (proveedor && proveedor.label) {
-                    const parts = proveedor.label.split(' - ');
-                    if (parts.length >= 3) {
-                        numeroOracle = parts[2].trim();
+            if (window.googleSheetsDb && typeof window.googleSheetsDb.getSheetData === 'function') {
+                const proveedores = window.googleSheetsDb.getSheetData('Proveedores');
+                console.log("Proveedores disponibles:", proveedores);
+                console.log("RUC buscado:", rucValue);
+                
+                if (Array.isArray(proveedores)) {
+                    const proveedor = proveedores.find(p => p.value === rucValue);
+                    console.log("Proveedor encontrado:", proveedor);
+                    if (proveedor && proveedor.label) {
+                        const parts = proveedor.label.split(' - ');
+                        if (parts.length >= 3) {
+                            numeroOracle = parts[2].trim();
+                            console.log("Número Oracle extraído:", numeroOracle);
+                        }
                     }
                 }
             }
+            
             
             // Obtener el tipo de moneda para usarlo como sitio proveedor
             const tipoMoneda = document.getElementById('tipoMoneda').value;
