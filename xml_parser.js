@@ -16,7 +16,256 @@ class InvoiceParser {
         this.initializeNewFields();
         this.initializeDesgloseFactura();
         this.initializeDescripcionLimit();
+        this.initializeTooltips();  
     }
+
+    // Método para inicializar el sistema de tooltips (función modular)
+initializeTooltips() {
+    // Configuración inicial de tooltips
+    this.tooltips = {
+        'ruc': 'Seleccione un proveedor válido de la lista, de no encontrarlo, revise las condiciones generales',
+        'razonSocial': 'Este campo se rellenará automáticamente al seleccionar un proveedor válido en el campo RUC'
+        // Puedes agregar más campos aquí como 'idDelCampo': 'Mensaje del tooltip'
+    };
+    
+    // Aplicar tooltips configurados
+    this.applyTooltips();
+    
+    // Configurar comportamiento específico RUC-Razón Social (función separada)
+    this.setupRucRazonSocialBehavior();
+}
+
+// Método para aplicar los tooltips configurados
+applyTooltips() {
+    for (const [fieldId, message] of Object.entries(this.tooltips)) {
+        this.addTooltip(fieldId, message);
+    }
+}
+
+// Método para añadir un tooltip a un campo específico
+addTooltip(fieldId, message) {
+    const field = document.getElementById(fieldId);
+    if (!field) return false; // Si no existe el campo, salimos
+    
+    // Obtenemos el label del campo
+    let labelElement = document.querySelector(`label[for="${fieldId}"]`);
+    if (!labelElement) return false; // Si no tiene label, salimos
+    
+    // Evitamos duplicados
+    const existingTooltip = labelElement.querySelector('.tooltip-icon');
+    if (existingTooltip) {
+        existingTooltip.title = message;
+        return true;
+    }
+    
+    // Creamos el icono de tooltip
+    const tooltipIcon = document.createElement('span');
+    tooltipIcon.className = 'tooltip-icon';
+    tooltipIcon.innerHTML = '?';
+    tooltipIcon.title = message;
+    tooltipIcon.setAttribute('data-for', fieldId);
+    
+    // Añadimos estilos al tooltip
+    tooltipIcon.style.display = 'inline-block';
+    tooltipIcon.style.marginLeft = '5px';
+    tooltipIcon.style.backgroundColor = '#4A90E2';
+    tooltipIcon.style.color = 'white';
+    tooltipIcon.style.width = '16px';
+    tooltipIcon.style.height = '16px';
+    tooltipIcon.style.borderRadius = '50%';
+    tooltipIcon.style.textAlign = 'center';
+    tooltipIcon.style.lineHeight = '16px';
+    tooltipIcon.style.fontSize = '12px';
+    tooltipIcon.style.fontWeight = 'bold';
+    tooltipIcon.style.cursor = 'help';
+    tooltipIcon.style.transition = 'all 0.3s ease';
+    
+    // Añadimos el tooltip al label
+    labelElement.appendChild(tooltipIcon);
+    
+    return true;
+}
+
+// Método específico para configurar comportamiento entre RUC y Razón Social
+setupRucRazonSocialBehavior() {
+    const rucSearchInput = document.getElementById('rucSearch');
+    const rucField = document.getElementById('ruc');
+    const razonSocialField = document.getElementById('razonSocial');
+    
+    if (!rucSearchInput || !rucField || !razonSocialField) return;
+    
+    // Encontrar los tooltips - CORREGIDO para usar los labels correctos
+    const rucLabel = document.querySelector('label[for="ruc"]');
+    const razonSocialLabel = document.querySelector('label[for="razonSocial"]');
+    
+    if (!rucLabel || !razonSocialLabel) return;
+    
+    const rucTooltip = rucLabel.querySelector('.tooltip-icon');
+    const razonSocialTooltip = razonSocialLabel.querySelector('.tooltip-icon');
+    
+    if (!rucTooltip || !razonSocialTooltip) return;
+    
+    // Flag para rastrear si se ha seleccionado un proveedor
+    let proveedorSeleccionado = false;
+    
+    // Función para crear y mostrar un tooltip persistente
+    const mostrarTooltipPersistente = (targetElement, mensaje, offsetElement) => {
+        // Elemento sobre el que posicionar (puede ser diferente del targetElement)
+        const positionElement = offsetElement || targetElement;
+        
+        // Remover tooltip persistente previo si existe
+        const prevTooltip = document.querySelector(`.tooltip-persistente[data-for="${targetElement.id}"]`);
+        if (prevTooltip) {
+            prevTooltip.remove();
+        }
+        
+        // Si ya se seleccionó un proveedor, no mostrar tooltips
+        if (proveedorSeleccionado) return;
+        
+        const tooltip = document.createElement('div');
+        tooltip.className = 'tooltip-persistente';
+        tooltip.setAttribute('data-for', targetElement.id);
+        tooltip.textContent = mensaje;
+        
+        // Estilos para el tooltip persistente
+        tooltip.style.position = 'absolute';
+        tooltip.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+        tooltip.style.color = 'white';
+        tooltip.style.padding = '5px 10px';
+        tooltip.style.borderRadius = '4px';
+        tooltip.style.fontSize = '12px';
+        tooltip.style.maxWidth = '250px';
+        tooltip.style.zIndex = '1000';
+        tooltip.style.pointerEvents = 'none';
+        tooltip.style.opacity = '1';
+        tooltip.style.transition = 'opacity 0.3s ease';
+        tooltip.style.whiteSpace = 'normal';
+        
+        // Añadir al body para evitar problemas de posicionamiento
+        document.body.appendChild(tooltip);
+        
+        // Posicionamiento del tooltip después de añadirlo
+        const updatePosition = () => {
+            const rect = positionElement.getBoundingClientRect();
+            const scrollTop = window.scrollY || document.documentElement.scrollTop;
+            const tooltipRect = tooltip.getBoundingClientRect();
+            
+            tooltip.style.top = (rect.top + scrollTop - tooltipRect.height - 10) + 'px';
+            tooltip.style.left = (rect.left + (rect.width / 2) - (tooltipRect.width / 2)) + 'px';
+        };
+        
+        // Actualizar posición inmediatamente y en un timeout para asegurar
+        updatePosition();
+        setTimeout(updatePosition, 50);
+        
+        return tooltip;
+    };
+    
+    // Función para activar los tooltips persistentes
+    const activarTooltipsPersistentes = () => {
+        if (!proveedorSeleccionado) {
+            // Para el campo RUC, usar rucSearchInput como target pero rucLabel como referencia
+            mostrarTooltipPersistente(rucSearchInput, rucTooltip.title);
+            mostrarTooltipPersistente(razonSocialField, razonSocialTooltip.title);
+        }
+    };
+    
+    // Función para remover todos los tooltips persistentes
+    const removerTooltipsPersistentes = () => {
+        document.querySelectorAll('.tooltip-persistente').forEach(el => el.remove());
+    };
+    
+    // Verificar si el campo RUC ya tiene valor (por ejemplo, después de cargar XML)
+    const verificarRucAutorrellenado = () => {
+        if (rucField.value && rucField.value.trim() !== '') {
+            // Si ya hay un valor en el campo RUC, mostrar los tooltips
+            setTimeout(activarTooltipsPersistentes, 500);
+        }
+    };
+    
+    // Llamar inmediatamente y también cuando cambia el XML
+    verificarRucAutorrellenado();
+    
+    // Cuando se carga un XML que autorellena el RUC
+    document.getElementById('xmlFile').addEventListener('change', () => {
+        // Primero dar tiempo a que se procese el XML
+        setTimeout(() => {
+            verificarRucAutorrellenado();
+        }, 1000);
+    });
+    
+    // Cuando el usuario hace focus en el campo RUC
+    rucSearchInput.addEventListener('focus', activarTooltipsPersistentes);
+    
+    // Cuando se selecciona un proveedor de la lista
+    document.addEventListener('click', (e) => {
+        if (e.target.classList.contains('select-option') && 
+            e.target.closest('#rucOptions')) {
+            // Marcar como proveedor seleccionado
+            proveedorSeleccionado = true;
+            
+            // Remover tooltips persistentes
+            removerTooltipsPersistentes();
+        }
+    });
+    
+    // Restablecer el flag cuando se borra el campo RUC
+    rucSearchInput.addEventListener('input', () => {
+        if (rucSearchInput.value.trim() === '') {
+            proveedorSeleccionado = false;
+            removerTooltipsPersistentes();
+        } else {
+            // Si hay texto pero aún no se ha seleccionado un proveedor
+            if (!proveedorSeleccionado) {
+                activarTooltipsPersistentes();
+            }
+        }
+    });
+    
+    // Añadir un listener al formulario para detectar cambios en el campo ruc hidden
+    // Esto ayuda a detectar cuando se autorrellena desde XML
+    const observer = new MutationObserver(function(mutations) {
+        mutations.forEach(function(mutation) {
+            if (mutation.type === 'attributes' && mutation.attributeName === 'value') {
+                verificarRucAutorrellenado();
+            }
+        });
+    });
+    
+    observer.observe(rucField, { attributes: true });
+    
+    // Añadir estilo global para tooltips persistentes si no existe
+    if (!document.getElementById('tooltip-persistente-style')) {
+        const style = document.createElement('style');
+        style.id = 'tooltip-persistente-style';
+        style.textContent = `
+            .tooltip-persistente {
+                position: absolute;
+                background-color: rgba(0, 0, 0, 0.8);
+                color: white;
+                padding: 5px 10px;
+                border-radius: 4px;
+                font-size: 12px;
+                max-width: 250px;
+                z-index: 1000;
+                pointer-events: none;
+                text-align: center;
+            }
+            
+            .tooltip-persistente:after {
+                content: '';
+                position: absolute;
+                bottom: -5px;
+                left: 50%;
+                margin-left: -5px;
+                border-width: 5px 5px 0;
+                border-style: solid;
+                border-color: rgba(0, 0, 0, 0.8) transparent transparent;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+}
 
     initializeEventListeners() {
         document.getElementById('xmlFile').addEventListener('change', (e) => this.handleFileUpload(e));
