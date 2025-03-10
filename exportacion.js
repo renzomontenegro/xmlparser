@@ -186,7 +186,9 @@ class ExcelExporter {
             
             // Extraer número de factura y construir descripción
             const facturaNum = formData.basic.numeroComprobante.split('-')[1] || '';
-            const baseDescription = `${formData.basic.razonSocial} ${formData.basic.descripcion}`;
+            // Limitar razón social a 25 caracteres para el formato ERP
+            const razonSocialLimitada = formData.basic.razonSocial.substring(0, 25);
+            const baseDescription = `${razonSocialLimitada} ${formData.basic.descripcion}`;
             
             // Obtener el número Oracle del proveedor
             let numeroOracle = '';
@@ -226,7 +228,8 @@ class ExcelExporter {
             // Formatear Información Adicional correctamente
             const codigoDetraccionFormato = codigoDetraccion || '.';
             const codigoTipoDetraccion = tieneDetraccion ? '01' : '.';
-            const infoAdicional = `...${tipoFacturaCodigo || '.'}....5.${codigoTipoDetraccion}.${codigoDetraccionFormato}.......`;
+            // Añadir espacios entre cada carácter del formato de información adicional
+            const infoAdicional = `. . .${tipoFacturaCodigo || ' '} . . . .5.${codigoTipoDetraccion}.${codigoDetraccionFormato}. . . . . . .`;
 
             // Procesar items normales y otros cargos
             let allItems = [...formData.items];
