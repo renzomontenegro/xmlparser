@@ -229,7 +229,7 @@ class ExcelExporter {
             const codigoDetraccionFormato = codigoDetraccion || '.';
             const codigoTipoDetraccion = tieneDetraccion ? '01' : '.';
             // Añadir espacios entre cada carácter del formato de información adicional
-            const infoAdicional = `. . .${tipoFacturaCodigo || ' '} . . . .5.${codigoTipoDetraccion}.${codigoDetraccionFormato}. . . . . . .`;
+            const infoAdicional = `. . .${tipoFacturaCodigo || ' '} . . . .5.${codigoTipoDetraccion || ' '}.${codigoDetraccionFormato || ' '}. . . . . . .`;
 
             // Procesar items normales y otros cargos
             let allItems = [...formData.items];
